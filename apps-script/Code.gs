@@ -25,7 +25,7 @@ const EC = {}; E_HEADERS.forEach(function (h, i) { EC[h] = i; });
 const P_HEADERS = ['رقم القيد', 'الوحدة', 'القطاع', 'الصنف', 'التاريخ', 'بواسطة', 'الحساب', 'الدور', 'الشركة', 'الحالة'];
 const A_HEADERS = ['التاريخ', 'مشرف أمن إعمار', 'الحساب', 'القطاع', 'الوحدة', 'التقييم', 'ملاحظات'];
 const L_HEADERS = ['التاريخ', 'الحساب', 'رقم القيد', 'الحقل', 'من', 'إلى'];
-const U_HEADERS = ['اسم المستخدم', 'الاسم', 'الدور', 'الشركة', 'نشط', 'آخر دخول', 'تاريخ الإنشاء', 'الإيميل', 'salt', 'hash', 'ver'];
+const U_HEADERS = ['اسم المستخدم', 'الاسم', 'الدور', 'الشركة', 'نشط', 'آخر دخول', 'تاريخ الإنشاء', 'الإيميل', 'salt', 'hash', 'ver', 'القطاعات'];
 const LIST_HEADERS = ['القائمة', 'القيمة', 'نشط', 'صورة (Drive ID)', 'مصغّرة'];
 
 const ROLES = {
@@ -37,16 +37,32 @@ const HO = { waiting: 'بانتظار المطابقة', done: 'تمت المط�
 const FIELD = ['موجود', 'مفقود', 'تالف'];
 const RATINGS = ['ملتزم', 'يحتاج متابعة', 'غير ملتزم'];
 
-// مين يقدر يعمل إيه
-const CAN = {
-  add: ['guard', 'admin'],
-  review: ['supervisor', 'admin'],
-  patrol: ['guard', 'general_supervisor', 'company_manager', 'admin'],
-  viewAll: ['supervisor', 'general_supervisor', 'company_manager', 'emaar', 'admin'],
-  audit: ['emaar', 'admin'],
-  export: ['emaar', 'admin'],
-  edit: ['admin']
+// الصلاحيات: المكتب الرئيسي بيتحكم فيها من التطبيق (دي القيم الافتراضية بس).
+const PERMS = {
+  add: 'تسجيل حصر جديد',
+  review: 'مراجعة واعتماد القيود',
+  patrol: 'المرور الدوري',
+  dash: 'لوحة المتابعة والتنبيهات',
+  viewAll: 'كل القيود والبحث',
+  events: 'جولات المرور',
+  auditsView: 'عرض زيارات التدقيق',
+  audit: 'تسجيل زيارة تدقيق',
+  export: 'تحميل Excel',
+  edit: 'تعديل ومسح القيود'
 };
+const DEFAULT_CAN = {
+  add: ['guard'],
+  review: ['supervisor'],
+  patrol: ['guard', 'general_supervisor', 'company_manager'],
+  dash: ['supervisor', 'general_supervisor', 'company_manager', 'emaar'],
+  viewAll: ['supervisor', 'general_supervisor', 'company_manager', 'emaar'],
+  events: ['emaar'],
+  auditsView: ['supervisor', 'general_supervisor', 'company_manager', 'emaar'],
+  audit: ['emaar'],
+  export: ['emaar'],
+  edit: []
+};
+const PERMS_KEY = 'الصلاحيات';
 
 const DEFAULT_SECTORS = ['1-AREZZO', 'VERONA', 'ISOLA', 'VENETO', 'VERDI', 'VECTORIA', 'BLANCA 1', 'BLANCA 2', 'BLANCA 4-3', 'VALENCIA',
   'SAFI 2-1', 'CELIA', 'CATANIA 1', 'CATANIA 2', 'MARINA R1', 'MARINA R2', 'GREEK', 'SALERNO', 'LEA', 'FAYA', 'SKAYA', 'RIVA GREEK', 'ALTIA'];
@@ -173,7 +189,8 @@ function users_() {
     if (!r[0]) return;
     out.push({ row: i + 2, username: String(r[0]).trim().toLowerCase(), name: String(r[1]), role: roleKey_(r[2]), company: String(r[3] || ''),
       active: String(r[4]).trim() !== 'لا', lastLogin: String(r[5] || ''), created: String(r[6] || ''), email: String(r[7] || '').trim(),
-      salt: String(r[8]), hash: String(r[9]), ver: Number(r[10]) || 1 });
+      salt: String(r[8]), hash: String(r[9]), ver: Number(r[10]) || 1,
+      sectors: String(r[11] || '').split(/\s*،\s*/).map(function (x) { return x.trim(); }).filter(String) });
   });
   cache.put('users', JSON.stringify(out), 300);
   return out;
@@ -190,7 +207,7 @@ function roleKey_(v) {
 }
 function publicUser_(u) {
   return { username: u.username, name: u.name, role: u.role, roleLabel: ROLES[u.role], company: u.company, active: u.active,
-    lastLogin: u.lastLogin, created: u.created, email: u.email };
+    lastLogin: u.lastLogin, created: u.created, email: u.email, sectors: u.role === 'admin' ? [] : (u.sectors || []) };
 }
 
 function hash_(salt, pw) {
@@ -210,8 +227,8 @@ function makeToken_(u) {
   return Utilities.base64EncodeWebSafe(p) + '.' + sign_(p);
 }
 
-/** بيرجع المستخدم أو بيرمي AUTH. roles اختياري (مصفوفة أدوار مسموحة). */
-function auth_(token, roles) {
+/** بيرجع المستخدم أو بيرمي AUTH. need اختياري: صلاحية (أو أكتر) من PERMS، أو ['admin']. */
+function auth_(token, need) {
   const parts = String(token || '').split('.');
   if (parts.length !== 2) throw new Error('AUTH');
   let p;
@@ -221,8 +238,54 @@ function auth_(token, roles) {
   if (Number(f[1]) < Date.now()) throw new Error('AUTH');
   const u = findUser_(f[0]);
   if (!u || !u.active || String(u.ver) !== f[2]) throw new Error('AUTH');
-  if (roles && roles.indexOf(u.role) < 0) throw new Error('مش مسموح لحسابك بالعملية دي.');
+  if (need) {
+    const list = [].concat(need);
+    const ok = list.some(function (k) { return k === 'admin' ? u.role === 'admin' : can_(u, k); });
+    if (!ok) throw new Error('مش مسموح لحسابك بالعملية دي.');
+  }
   return u;
+}
+
+// ---------------------------------------------------------------- permissions & sectors
+
+function perms_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get('perms');
+  if (hit) return JSON.parse(hit);
+  let saved = null;
+  values_(settingsSheet_(), 2).forEach(function (r) { if (String(r[0]).trim() === PERMS_KEY) { try { saved = JSON.parse(String(r[1])); } catch (e) {} } });
+  const out = {};
+  Object.keys(PERMS).forEach(function (k) {
+    const list = saved && Array.isArray(saved[k]) ? saved[k] : DEFAULT_CAN[k];
+    out[k] = list.filter(function (r) { return ROLES[r] && r !== 'admin'; });
+  });
+  cache.put('perms', JSON.stringify(out), 300);
+  return out;
+}
+/** المكتب الرئيسي معاه كل الصلاحيات دايمًا. */
+function can_(u, k) { return u.role === 'admin' || (perms_()[k] || []).indexOf(u.role) >= 0; }
+
+/** القطاعات المسموحة للمستخدم، أو null = كل القطاعات. */
+function scope_(u) { return u.role === 'admin' || !u.sectors || !u.sectors.length ? null : u.sectors; }
+function inScope_(u, sector) { const s = scope_(u); return !s || s.indexOf(String(sector)) >= 0; }
+function scopedEntries_(u) { return entries_().filter(function (e) { return inScope_(u, e.sector); }); }
+function mustScope_(u, sector) { if (!inScope_(u, sector)) throw new Error('القطاع ده مش ضمن القطاعات بتاعتك.'); }
+
+function savePerms(token, map) {
+  auth_(token, ['admin']);
+  const out = {};
+  Object.keys(PERMS).forEach(function (k) {
+    out[k] = (map && Array.isArray(map[k]) ? map[k] : []).filter(function (r) { return ROLES[r] && r !== 'admin'; });
+  });
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = settingsSheet_();
+    let r = -1;
+    values_(sh, 1).forEach(function (x, i) { if (String(x[0]).trim() === PERMS_KEY) r = i + 2; });
+    if (r > 0) sh.getRange(r, 2).setValue(JSON.stringify(out)); else sh.appendRow([PERMS_KEY, JSON.stringify(out)]);
+    dropCache_('perms');
+  } finally { lock.releaseLock(); }
+  return adminData(token);
 }
 
 function lists_() {
@@ -244,8 +307,8 @@ function lists_() {
 function boot_(u) {
   const l = lists_();
   const can = {};
-  Object.keys(CAN).forEach(function (k) { can[k] = CAN[k].indexOf(u.role) >= 0; });
-  return { me: publicUser_(u), can: can, sectors: l.sectors, items: l.items, companies: l.companies,
+  Object.keys(PERMS).forEach(function (k) { can[k] = can_(u, k); });
+  return { me: publicUser_(u), can: can, sectors: l.sectors.filter(function (s) { return inScope_(u, s); }), items: l.items, companies: l.companies,
     catalogPhotos: l.all.filter(function (x) { return x.kind === 'item' && x.hasPhoto; }).map(function (x) { return x.value; }),
     overdueDays: overdueDays_(), sup: SUP, ho: HO, ratings: RATINGS };
 }
@@ -287,7 +350,7 @@ function changeMyPassword(token, oldPw, newPw) {
   const u = auth_(token);
   if (hash_(u.salt, oldPw) !== u.hash) throw new Error('كلمة السر الحالية غلط.');
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try { writeUser_({ username: u.username, name: u.name, role: u.role, company: u.company, active: true, password: newPw, email: u.email }, false); }
+  try { writeUser_({ username: u.username, name: u.name, role: u.role, company: u.company, active: true, password: newPw, email: u.email, sectors: u.sectors }, false); }
   finally { lock.releaseLock(); }
   return makeToken_(findUser_(u.username));
 }
@@ -298,7 +361,8 @@ function adminData(token) {
   auth_(token, ['admin']);
   const l = lists_();
   return { users: users_().map(publicUser_), roles: ROLES, lists: l.all.map(function (x) { const o = Object.assign({}, x); delete o.row; return o; }),
-    companies: l.companies, overdueDays: overdueDays_() };
+    companies: l.companies, sectors: l.all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; }),
+    overdueDays: overdueDays_(), perms: perms_(), permLabels: PERMS };
 }
 
 function saveUser(token, d) {
@@ -346,12 +410,15 @@ function writeUser_(d, isNew) {
   if (!isNew && !existing) throw new Error('المستخدم مش موجود.');
   const pw = String(d.password || '');
   if ((isNew || pw) && pw.length < 6) throw new Error('كلمة السر لازم تبقى ٦ حروف أو أرقام على الأقل.');
+  const known = lists_().all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; });
+  let sectors = d.sectors === undefined && existing ? existing.sectors : (Array.isArray(d.sectors) ? d.sectors : []);
+  sectors = role === 'admin' ? [] : sectors.map(function (x) { return String(x).trim(); }).filter(function (x, i, a) { return known.indexOf(x) >= 0 && a.indexOf(x) === i; });
   let salt = existing ? existing.salt : '', hash = existing ? existing.hash : '', ver = existing ? existing.ver : 1;
   if (pw) { salt = Utilities.getUuid(); hash = hash_(salt, pw); if (existing) ver++; }
   if (existing && existing.active && !active) ver++;
   if (existing && existing.role !== role) ver++;
   const row = [username, name, ROLES[role], company, active ? 'نعم' : 'لا', existing ? existing.lastLogin : '', existing ? existing.created : stamp_(new Date()),
-    d.email === undefined && existing ? existing.email : email, salt, hash, String(ver)];
+    d.email === undefined && existing ? existing.email : email, salt, hash, String(ver), sectors.join(' ، ')];
   const sh = usersSheet_();
   if (existing) sh.getRange(existing.row, 1, 1, row.length).setValues([row]); else sh.appendRow(row);
   dropCache_('users');
@@ -480,11 +547,12 @@ function nextId_() {
 }
 
 function addEntry(token, d, photo) {
-  const u = auth_(token, CAN.add);
+  const u = auth_(token, 'add');
   const l = lists_();
   const unit = clean_(d.unit).toUpperCase(), sector = clean_(d.sector), item = clean_(d.item), qty = Math.round(Number(d.qty));
   if (!unit) throw new Error('اكتب رقم الوحدة.');
   if (l.sectors.indexOf(sector) < 0) throw new Error('اختار القطاع.');
+  mustScope_(u, sector);
   if (l.items.indexOf(item) < 0) throw new Error('اختار الصنف.');
   if (!(qty >= 1 && qty <= 9999)) throw new Error('اكتب الكمية (رقم من ١ أو أكتر).');
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
@@ -509,8 +577,8 @@ function myEntries(token) {
 }
 
 function reviewList(token) {
-  auth_(token, CAN.review);
-  const all = entries_();
+  const u = auth_(token, 'review');
+  const all = scopedEntries_(u);
   return {
     pending: all.filter(function (e) { return e.supStatus === SUP.pending; }).slice(0, 300).map(clientEntry_),
     done: all.filter(function (e) { return e.supStatus !== SUP.pending && e.supDate; })
@@ -520,11 +588,12 @@ function reviewList(token) {
 
 /** اعتماد المشرف = المطابقة النهائية (زي النموذج التجريبي). */
 function review(token, id, approve) {
-  const u = auth_(token, CAN.review);
+  const u = auth_(token, 'review');
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     const e = entry_(id);
     if (!e) throw new Error('القيد ده مش موجود.');
+    mustScope_(u, e.sector);
     if (e.supStatus !== SUP.pending) throw new Error('القيد ده اتراجع قبل كده (' + e.supStatus + ').');
     const sh = entriesSheet_(), now = stamp_(new Date());
     const set = function (h, v) { sh.getRange(e.row, EC[h] + 1).setValue(v); };
@@ -536,8 +605,9 @@ function review(token, id, approve) {
 
 /** العناصر المعتمدة للمرور عليها، الأقدم مرور الأول. */
 function patrolList(token, sector, unit) {
-  const u = auth_(token, CAN.patrol);
+  const u = auth_(token, 'patrol');
   if (!sector) throw new Error('اختار القطاع الأول.');
+  mustScope_(u, sector);
   unit = String(unit || '').trim().toLowerCase();
   const list = entries_().filter(function (e) {
     return e.hoStatus === HO.done && e.sector === sector && (!unit || e.unit.toLowerCase().indexOf(unit) >= 0);
@@ -547,13 +617,14 @@ function patrolList(token, sector, unit) {
 }
 
 function patrol(token, id, status) {
-  const u = auth_(token, CAN.patrol);
+  const u = auth_(token, 'patrol');
   if (FIELD.indexOf(status) < 0) throw new Error('حالة غير صحيحة.');
   let e;
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     e = entry_(id);
     if (!e) throw new Error('القيد ده مش موجود.');
+    mustScope_(u, e.sector);
     if (e.hoStatus !== HO.done) throw new Error('القيد ده لسه ما اتعتمدش.');
     const now = stamp_(new Date());
     patrolsSheet_().appendRow([e.id, e.unit, e.sector, e.item, "'" + now, u.name, u.username, ROLES[u.role], u.role === 'company_manager' ? u.company : '', status]);
@@ -569,7 +640,7 @@ function patrol(token, id, status) {
 /** إيميل فوري للمكتب الرئيسي والمشرفين (اللي عليهم إيميل) لما حاجة تتسجل مفقودة أو تالفة. */
 function alertMissing_(e, status, u) {
   try {
-    let to = users_().filter(function (x) { return x.active && x.email && (x.role === 'admin' || x.role === 'supervisor'); }).map(function (x) { return x.email; });
+    let to = users_().filter(function (x) { return x.active && x.email && (x.role === 'admin' || x.role === 'supervisor') && inScope_(x, e.sector); }).map(function (x) { return x.email; });
     if (!to.length) { try { to = [Session.getEffectiveUser().getEmail()]; } catch (err) {} }
     if (!to.length || !to[0]) return;
     const body = '<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif">' +
@@ -583,7 +654,7 @@ function alertMissing_(e, status, u) {
 }
 
 function myPatrols(token) {
-  const u = auth_(token, CAN.patrol);
+  const u = auth_(token, 'patrol');
   const sh = patrolsSheet_(), last = sh.getLastRow();
   const rows = values_(sh, P_HEADERS.length, Math.max(2, last - 1999));
   return rows.reverse().filter(function (r) { return r[6] === u.username; }).slice(0, 30).map(patrolObj_);
@@ -593,16 +664,18 @@ function patrolObj_(r) {
 }
 
 function patrolEvents(token, limit) {
-  auth_(token, CAN.viewAll);
+  const u = auth_(token, 'events');
   const sh = patrolsSheet_(), last = sh.getLastRow();
   limit = Math.min(Number(limit) || 40, 500);
-  return values_(sh, P_HEADERS.length, Math.max(2, last - limit + 1)).reverse().map(patrolObj_);
+  const span = scope_(u) ? limit * 10 : limit;
+  return values_(sh, P_HEADERS.length, Math.max(2, last - span + 1)).reverse()
+    .filter(function (r) { return inScope_(u, r[2]); }).slice(0, limit).map(patrolObj_);
 }
 
 /** لوحة المتابعة: الأرقام، الالتزام، التوزيع، والتنبيهات. */
 function dashboard(token) {
-  auth_(token, CAN.viewAll);
-  const all = entries_().map(clientEntry_);
+  const u = auth_(token, 'dash');
+  const all = scopedEntries_(u).map(clientEntry_);
   const verified = all.filter(function (e) { return e.verified; });
   const overdue = verified.filter(function (e) { return e.overdue; });
   const flagged = all.filter(function (e) { return e.flag; });
@@ -636,8 +709,8 @@ function matches_(e, f) {
   return true;
 }
 function searchEntries(token, f, offset) {
-  auth_(token, CAN.viewAll);
-  const rows = entries_().filter(function (e) { return matches_(e, f); });
+  const u = auth_(token, 'viewAll');
+  const rows = scopedEntries_(u).filter(function (e) { return matches_(e, f); });
   offset = Number(offset) || 0;
   return { total: rows.length, items: rows.slice(offset, offset + 50).map(clientEntry_) };
 }
@@ -646,7 +719,7 @@ function getEntry(token, id) {
   const u = auth_(token);
   const e = entry_(id);
   if (!e) throw new Error('القيد ده مش موجود.');
-  if (u.role === 'guard' && e.guardUser !== u.username && e.hoStatus !== HO.done) throw new Error('مش مسموح لحسابك تشوف القيد ده.');
+  mustSee_(u, e);
   const psh = patrolsSheet_();
   const checks = psh.getLastRow() < 2 ? [] : psh.getRange(2, 1, psh.getLastRow() - 1, 1).createTextFinder(e.id).matchEntireCell(true).findAll()
     .map(function (c) { return patrolObj_(psh.getRange(c.getRow(), 1, 1, P_HEADERS.length).getValues()[0].map(fmt_)); }).reverse();
@@ -659,21 +732,30 @@ function getEntry(token, id) {
   return { entry: clientEntry_(e), checks: checks, edits: edits };
 }
 
+/** مين يقدر يفتح القيد: لازم يكون في قطاعاته، واللي معندوش صلاحية عرض بيشوف قيوده أو المعتمد بس. */
+function mustSee_(u, e) {
+  const deny = function () { throw new Error('مش مسموح لحسابك تشوف القيد ده.'); };
+  if (!inScope_(u, e.sector) && e.guardUser !== u.username) deny();
+  if (['viewAll', 'dash', 'review', 'edit', 'events'].some(function (k) { return can_(u, k); })) return;
+  if (e.guardUser !== u.username && e.hoStatus !== HO.done) deny();
+}
 function entryPhoto(token, id) {
-  auth_(token);
+  const u = auth_(token);
   const e = entry_(id);
   if (!e || !e.photoId) return '';
+  mustSee_(u, e);
   return 'data:image/jpeg;base64,' + Utilities.base64Encode(DriveApp.getFileById(e.photoId).getBlob().getBytes());
 }
 
 /** تعديل كامل من المكتب الرئيسي، وكل تغيير بيتسجل في سجل التعديلات. */
 function updateEntry(token, id, d) {
-  const u = auth_(token, CAN.edit);
+  const u = auth_(token, 'edit');
   const l = lists_();
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     const e = entry_(id);
     if (!e) throw new Error('القيد ده مش موجود.');
+    mustScope_(u, e.sector);
     const next = {
       'رقم الوحدة': clean_(d.unit).toUpperCase(), 'القطاع': clean_(d.sector), 'الصنف': clean_(d.item), 'الكمية': String(Math.round(Number(d.qty))),
       'ملاحظات فرد الأمن': clean_(d.notes, 1000), 'حالة المشرف': d.supStatus, 'حالة المطابقة': d.hoStatus, 'الحالة الميدانية': d.flag || ''
@@ -681,6 +763,7 @@ function updateEntry(token, id, d) {
     if (!next['رقم الوحدة']) throw new Error('اكتب رقم الوحدة.');
     if (!(Number(next['الكمية']) >= 1)) throw new Error('اكتب الكمية.');
     if (next['القطاع'] !== e.sector && l.sectors.indexOf(next['القطاع']) < 0) throw new Error('اختار القطاع.');
+    mustScope_(u, next['القطاع']);
     if (next['الصنف'] !== e.item && l.items.indexOf(next['الصنف']) < 0) throw new Error('اختار الصنف.');
     if ([SUP.pending, SUP.approved, SUP.rejected].indexOf(next['حالة المشرف']) < 0) throw new Error('حالة المشرف غير صحيحة.');
     if ([HO.waiting, HO.done, HO.none].indexOf(next['حالة المطابقة']) < 0) throw new Error('حالة المطابقة غير صحيحة.');
@@ -702,11 +785,12 @@ function updateEntry(token, id, d) {
 }
 
 function deleteEntry(token, id) {
-  const u = auth_(token, CAN.edit);
+  const u = auth_(token, 'edit');
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     const e = entry_(id);
     if (!e) throw new Error('القيد ده مش موجود.');
+    mustScope_(u, e.sector);
     const now = stamp_(new Date());
     entriesSheet_().getRange(e.row, EC['محذوف'] + 1).setValue(u.username + ' ' + now);
     editsSheet_().appendRow(["'" + now, u.username, e.id, 'مسح القيد', '', 'محذوف']);
@@ -717,40 +801,42 @@ function deleteEntry(token, id) {
 // ================================================================ Emaar audits
 
 function addAudit(token, d) {
-  const u = auth_(token, CAN.audit);
+  const u = auth_(token, 'audit');
   const sector = clean_(d.sector), rating = RATINGS.indexOf(d.rating) >= 0 ? d.rating : '';
   if (lists_().sectors.indexOf(sector) < 0) throw new Error('اختار القطاع.');
+  mustScope_(u, sector);
   if (!rating) throw new Error('اختار التقييم.');
   auditsSheet_().appendRow(["'" + stamp_(new Date()), u.name, u.username, sector, clean_(d.unit).toUpperCase(), rating, clean_(d.notes, 1000)]);
   return listAudits(token);
 }
 function listAudits(token) {
-  auth_(token, CAN.viewAll);
+  const u = auth_(token, ['auditsView', 'audit']);
   const sh = auditsSheet_(), last = sh.getLastRow();
-  return values_(sh, A_HEADERS.length, Math.max(2, last - 199)).reverse()
+  return values_(sh, A_HEADERS.length, Math.max(2, last - (scope_(u) ? 1999 : 199))).reverse()
+    .filter(function (r) { return inScope_(u, r[3]); }).slice(0, 200)
     .map(function (r) { return { date: String(r[0]), by: String(r[1]), sector: String(r[3]), unit: String(r[4]), rating: String(r[5]), notes: String(r[6]) }; });
 }
 
 // ================================================================ exports (CSV)
 
 function exportEntries(token, f) {
-  auth_(token, CAN.export);
+  const u = auth_(token, 'export');
   const head = ['رقم القيد', 'رقم الوحدة', 'القطاع', 'الصنف', 'الكمية', 'فرد الأمن', 'تاريخ الحصر', 'حالة المشرف', 'اسم المشرف', 'تاريخ المراجعة',
     'حالة المطابقة', 'تاريخ المطابقة', 'الحالة الميدانية', 'آخر مرور', 'آخر مرور بواسطة', 'له صورة', 'ملاحظات فرد الأمن'];
-  return [head].concat(entries_().filter(function (e) { return matches_(e, f); }).map(function (e) {
+  return [head].concat(scopedEntries_(u).filter(function (e) { return matches_(e, f); }).map(function (e) {
     return [e.id, e.unit, e.sector, e.item, e.qty, e.guardName, e.guardDate, e.supStatus, e.supName, e.supDate, e.hoStatus, e.hoDate,
       e.flag || 'سليم', e.lastCheck, e.lastCheckBy, e.hasPhoto ? 'نعم' : 'لا', e.notes];
   }));
 }
 function exportPatrols(token) {
-  auth_(token, CAN.export);
+  const u = auth_(token, 'export');
   return [['رقم القيد', 'التاريخ', 'بواسطة', 'الدور', 'الشركة', 'الوحدة', 'القطاع', 'الصنف', 'الحالة']].concat(
-    values_(patrolsSheet_(), P_HEADERS.length).reverse().map(function (r) { return [r[0], r[4], r[5], r[7], r[8], r[1], r[2], r[3], r[9]]; }));
+    values_(patrolsSheet_(), P_HEADERS.length).reverse().filter(function (r) { return inScope_(u, r[2]); }).map(function (r) { return [r[0], r[4], r[5], r[7], r[8], r[1], r[2], r[3], r[9]]; }));
 }
 function exportAudits(token) {
-  auth_(token, CAN.export);
+  const u = auth_(token, 'export');
   return [['التاريخ', 'مشرف أمن إعمار', 'القطاع', 'الوحدة', 'التقييم', 'ملاحظات']].concat(
-    values_(auditsSheet_(), A_HEADERS.length).reverse().map(function (r) { return [r[0], r[1], r[3], r[4], r[5], r[6]]; }));
+    values_(auditsSheet_(), A_HEADERS.length).reverse().filter(function (r) { return inScope_(u, r[3]); }).map(function (r) { return [r[0], r[1], r[3], r[4], r[5], r[6]]; }));
 }
 
 // ================================================================ helpers
