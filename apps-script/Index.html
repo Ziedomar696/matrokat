@@ -10,7 +10,7 @@
 :root{
   --bg:#F6F4EF; --surface:#FFFFFF; --surface-2:#FAF8F3; --ink:#16233F; --muted:#6B6355; --line:#E4DFD3;
   --brand:#16233F; --brand-ink:#FFFFFF; --steel:#2F5D8C;
-  --amber:#B8791F; --amber-bg:#FBEEDA; --green:#276B5A; --green-bg:#E3F0EA; --red:#A93D28; --red-bg:#F8E7E2;
+  --amber:#B8791F; --amber-bg:#FBEEDA; --green:#276B5A; --green-bg:#E3F0EA; --red:#A93D28; --red-bg:#F8E7E2; --blue:#2a78d6; --blue-bg:#E4EEFA;
   --bar:#2F5D8C; --bar-hover:#16233F;
   --radius:12px;
   --sans:"IBM Plex Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;
@@ -22,7 +22,7 @@
     color-scheme:dark;
     --bg:#10141D; --surface:#171D29; --surface-2:#1D2432; --ink:#E8EAEF; --muted:#A39B8C; --line:#2D3546;
     --brand:#3B6FA5; --brand-ink:#FFFFFF; --steel:#7FA8D6;
-    --amber:#E3A84A; --amber-bg:#3A2C14; --green:#5CC0A0; --green-bg:#14322A; --red:#EE8A74; --red-bg:#3D1F18;
+    --amber:#E3A84A; --amber-bg:#3A2C14; --green:#5CC0A0; --green-bg:#14322A; --red:#EE8A74; --red-bg:#3D1F18; --blue:#6AA8F0; --blue-bg:#16263D;
     --bar:#7FA8D6; --bar-hover:#B5CFEB;
   }
 }
@@ -84,6 +84,17 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .p-green{background:var(--green-bg);color:var(--green)}
 .p-red{background:var(--red-bg);color:var(--red)}
 .p-grey{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.p-blue{background:var(--blue-bg);color:var(--blue)}
+.ccard{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-inline-start:4px solid var(--amber);border-radius:10px;background:var(--surface)}
+.ccard.done{border-inline-start-color:var(--green)}
+.ccard .t{font-weight:700;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ccard .m{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 12px}
+.ccard .camok{font-size:13px;color:var(--green);display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+.ccard .up{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center}
+.ccard .up .photo-in{padding:6px}.ccard .up .pv{width:64px;height:64px}
+img.cam{width:100%;max-height:320px;object-fit:contain;border-radius:8px;background:var(--surface-2)}
+@media (max-width:520px){.ccard .up{grid-template-columns:auto minmax(0,1fr)}.ccard .up button{grid-column:1/-1}}
+.camline{margin-top:4px}
 .alerts{display:grid;gap:10px}
 .alert{border-radius:var(--radius);padding:10px 14px;display:grid;gap:6px}
 .alert.red{background:var(--red-bg);border:1px solid var(--red)}
@@ -123,7 +134,12 @@ dialog{border:1px solid var(--line);border-radius:var(--radius);padding:0;backgr
 dialog::backdrop{background:rgba(10,14,22,.6)}
 dialog form,dialog .body{padding:16px;display:grid;gap:12px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px;margin:0}
-.kv dt{color:var(--muted)}.kv dd{margin:0}
+.kv dt{color:var(--muted)}.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+dialog .body>*,dialog form>*{min-width:0}
+.timeline>li{min-width:0;overflow-wrap:anywhere}
+.camline,.campv{min-width:0;max-width:100%}
+.camok .num,.timeline .num{white-space:nowrap}
+label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);align-self:end;padding-bottom:10px;cursor:pointer}
 .timeline{margin:0;padding-inline-start:18px;font-size:13px;display:grid;gap:4px}
 .hbars{display:grid;gap:8px}
 .hbar{display:grid;grid-template-columns:minmax(80px,32%) minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13px}
@@ -200,6 +216,7 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     <button role="tab" data-view="all">كل القيود</button>
     <button role="tab" data-view="events">جولات المرور</button>
     <button role="tab" data-view="audits">زيارات التدقيق</button>
+    <button role="tab" data-view="cctv">لقطات الكاميرات</button>
     <button role="tab" data-view="catalog">كتالوج الأصناف</button>
     <button role="tab" data-view="admin">المستخدمين والإعدادات</button>
   </nav>
@@ -310,6 +327,21 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     </div>
   </section>
 
+  <!-- لقطات الكاميرات -->
+  <section class="card" data-v="cctv" hidden>
+    <h2>لقطات الكاميرات <span class="chip" id="cCount"></span></h2>
+    <p class="hint">كل تسجيل حصر وكل مرور دوري بيظهر هنا. ارفع لكل حركة لقطة من الكاميرا للشخص اللي دخل الوحدة، علشان يبقى فيه إثبات بالصورة مين دخل وإمتى.</p>
+    <div class="bar-row">
+      <label class="f">القطاع<select id="cSector"></select></label>
+      <label class="f grow">رقم الوحدة (اختياري)<input id="cUnit" dir="ltr" style="text-align:right" placeholder="REZZO-014"></label>
+      <label class="f">الفترة<select id="cDays"><option value="1">النهارده</option><option value="3" selected>آخر 3 أيام</option><option value="7">آخر أسبوع</option><option value="31">آخر شهر</option></select></label>
+      <label class="chk"><input type="checkbox" id="cMissing" checked> من غير لقطة بس</label>
+      <button class="solid" id="cGo" type="button">عرض</button>
+    </div>
+    <div class="status" id="cStatus"></div>
+    <div class="plist" id="cList"></div>
+  </section>
+
   <!-- كتالوج -->
   <section class="card" data-v="catalog" hidden>
     <h2>كتالوج صور الأصناف <span class="chip" id="catCount"></span></h2>
@@ -358,6 +390,7 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     </div>
     <div id="ePhoto"></div>
     <dl class="kv" id="eKv"></dl>
+    <div id="eCam"></div>
     <div><h3 style="margin-bottom:4px">سجل المرور الدوري</h3><ol class="timeline" id="eChecks"></ol></div>
     <div id="eEditsBox" hidden><h3 style="margin-bottom:4px">سجل التعديلات</h3><ol class="timeline" id="eEdits"></ol></div>
     <form id="eForm" class="note" hidden style="display:grid;gap:10px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface-2)">
@@ -419,7 +452,7 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
   var $ = function(s){ return document.querySelector(s); };
   var $$ = function(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var store = { get: function(k){ try{ return localStorage.getItem(k) || ""; }catch(e){ return ""; } }, set: function(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
-  var ROLE_LABEL = { guard:"فرد الأمن", supervisor:"المشرف", general_supervisor:"المشرف العام", company_manager:"مدير شركة الأمن", emaar:"مشرف أمن إعمار", admin:"المكتب الرئيسي" };
+  var ROLE_LABEL = { guard:"فرد الأمن", supervisor:"المشرف", general_supervisor:"المشرف العام", company_manager:"مدير شركة الأمن", emaar:"مشرف أمن إعمار", cctv:"مراقب CCTV", admin:"المكتب الرئيسي" };
   // التابات بتظهر على حسب الصلاحيات اللي المكتب الرئيسي محددها
   function tabsFor(b){
     var c = b.can, t = [];
@@ -432,10 +465,11 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     if(c.viewAll) t.push("all");
     if(c.events) t.push("events");
     if(c.auditsView || c.audit) t.push("audits");
+    if(c.cctv) t.push("cctv");
     if(b.me.role === "admin") t.push("catalog", "admin");
     return t;
   }
-  var ROLE_ORDER = ["guard","supervisor","general_supervisor","company_manager","emaar"];
+  var ROLE_ORDER = ["guard","supervisor","general_supervisor","company_manager","emaar","cctv"];
   var TOKEN = store.get("mt.token"), B = null;
 
   // ---------- server (retries when Google is busy) ----------
@@ -535,7 +569,7 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     current = v;
     $$("#tabs button").forEach(function(b){ b.setAttribute("aria-selected", String(b.getAttribute("data-view") === v)); });
     $$("[data-v]").forEach(function(s){ s.hidden = s.getAttribute("data-v") !== v; });
-    ({ add: loadAdd, review: loadReview, patrol: loadPatrolMine, mine: loadMine, dash: loadDash, all: function(){ loadAll(true); }, events: loadEvents, audits: loadAudits, catalog: loadCatalog, admin: loadAdmin }[v] || function(){})();
+    ({ add: loadAdd, review: loadReview, patrol: loadPatrolMine, mine: loadMine, dash: loadDash, all: function(){ loadAll(true); }, events: loadEvents, audits: loadAudits, cctv: loadCctv, catalog: loadCatalog, admin: loadAdmin }[v] || function(){})();
   }
   $("#tabs").addEventListener("click", function(e){ var b = e.target.closest("button[data-view]"); if(b) showView(b.getAttribute("data-view")); });
 
@@ -547,7 +581,7 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     $("#tabs").hidden = tabs.length < 2;
     if(!tabs.length){ $$("[data-v]").forEach(function(s){ s.hidden = true; }); toast("حسابك لسه ملهوش صلاحيات. كلّم المكتب الرئيسي."); return; }
     options($("#aSector"), B.sectors, "اختار القطاع"); options($("#aItem"), B.items, "اختار الصنف");
-    options($("#pSector"), B.sectors, "اختار القطاع", store.get("mt.psector")); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع");
+    options($("#pSector"), B.sectors, "اختار القطاع", store.get("mt.psector")); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); options($("#cSector"), B.sectors, "كل القطاعات");
     $("#fStatus").innerHTML = '<option value="">كل الحالات</option>' + ["قيد المراجعة","معتمد","مرفوض","تمت المطابقة"].map(function(s){ return "<option>"+s+"</option>"; }).join("") + '<option value="flagged">بلاغات (مفقود / تالف)</option>';
     $("#auRating").innerHTML = B.ratings.map(function(r){ return "<option>"+esc(r)+"</option>"; }).join("");
     $("#auditForm").hidden = !B.can.audit;
@@ -696,7 +730,7 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     openEntry(t.getAttribute("data-open") || t.getAttribute("data-id"));
   });
   function openEntry(id){
-    $("#eId").textContent = id; $("#eTitle").textContent = "…"; $("#eKv").innerHTML = ""; $("#eChecks").innerHTML = ""; $("#ePhoto").innerHTML = ""; $("#eMsg").textContent = "";
+    $("#eId").textContent = id; $("#eTitle").textContent = "…"; $("#eKv").innerHTML = ""; $("#eChecks").innerHTML = ""; $("#ePhoto").innerHTML = ""; $("#eCam").innerHTML = ""; $("#eMsg").textContent = "";
     $("#eForm").hidden = true; $("#eEditsBox").hidden = true; $("#entryDlg").showModal();
     run("getEntry", TOKEN, id).then(showEntry).catch(function(err){ $("#eMsg").textContent = errMsg(err); });
   }
@@ -707,8 +741,9 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     if(e.hasPhoto) run("entryPhoto", TOKEN, e.id).then(function(src){ if(cur && cur.entry.id === e.id) $("#ePhoto").innerHTML = src ? '<img class="big-photo" alt="صورة '+esc(e.id)+'" src="'+src+'">' : ""; }).catch(function(){});
     var kv = [["الوحدة", e.unit + " · \u2068" + e.sector + "\u2069"], ["فرد الأمن", e.guardName + " · " + e.guardDate], ["ملاحظات", e.notes], ["حالة المشرف", e.supStatus + (e.supName ? " — " + e.supName + " · " + e.supDate : "")],
       ["حالة المطابقة", e.hoStatus + (e.hoDate ? " · " + e.hoDate : "")], ["آخر مرور", e.lastCheck ? e.lastCheck + " — " + e.lastCheckBy : (e.verified ? "لسه مفيش مرور" : "")], ["آخر تعديل", e.edited]];
-    $("#eKv").innerHTML = kv.filter(function(k){ return k[1]; }).map(function(k){ return "<dt>"+esc(k[0])+"</dt><dd>"+esc(k[1])+"</dd>"; }).join("");
-    $("#eChecks").innerHTML = r.checks.map(function(c){ return '<li><b>'+esc(c.status)+'</b> — '+esc(c.by)+' ('+esc(c.role)+(c.company ? " — "+esc(c.company) : "")+') · <span class="num">'+esc(c.date)+'</span></li>'; }).join("") || "<li>لسه مفيش مرور</li>";
+    $("#eKv").innerHTML = kv.filter(function(k){ return k[1]; }).map(function(k){ return "<dt>"+esc(k[0])+"</dt><dd>"+esc(k[1]).replace(/(\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2})?)/g, "\u2066$1\u2069")+"</dd>"; }).join("");
+    $("#eChecks").innerHTML = r.checks.map(function(c, i){ return '<li><b>'+esc(c.status)+'</b> — '+esc(c.by)+' ('+esc(c.role)+(c.company ? " — "+esc(c.company) : "")+') · <span class="num">'+esc(c.date)+'</span>'+camLine(c, "patrol", i)+'</li>'; }).join("") || "<li>لسه مفيش مرور</li>";
+    $("#eCam").innerHTML = e.hasCam ? '<h3 style="margin-bottom:4px">لقطة الكاميرا وقت الحصر</h3>' + camLine(e, "add", -1) : "";
     $("#eEditsBox").hidden = !r.edits.length;
     $("#eEdits").innerHTML = r.edits.map(function(x){ return '<li><b>'+esc(x.field)+'</b>: «'+esc(x.from)+'» ← «'+esc(x.to)+'» — '+esc(x.by)+' · <span class="num">'+esc(x.at)+'</span></li>'; }).join("");
     if(B.can.edit){
@@ -736,10 +771,69 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
       .catch(function(err){ $("#eMsg").textContent = errMsg(err); busy(b, false); });
   });
 
+  // ================================================================ CCTV
+  function camRef(x){ return x.kind === "add" || x.row === undefined ? { id: x.id } : { id: x.id, row: x.row, date: x.date }; }
+  function camLine(x, kind, i){
+    if(!x.hasCam) return "";
+    return '<div class="camline"><div class="camok">📷 لقطة الكاميرا — '+esc(x.camBy)+' · <span class="num">'+esc(x.camAt)+'</span>'+(x.camNote ? ' · '+esc(x.camNote) : '')+
+      ' <button class="sm ghost" type="button" data-cam="'+kind+'" data-i="'+i+'">عرض اللقطة</button></div><div class="campv"></div></div>';
+  }
+  function showCam(btn, kind, ref){
+    var box = btn.closest(".camline").querySelector(".campv");
+    if(box.innerHTML){ box.innerHTML = ""; btn.textContent = "عرض اللقطة"; return; }
+    box.innerHTML = '<div class="ph-wait">بيحمّل اللقطة…</div>'; btn.textContent = "إخفاء اللقطة";
+    run("cctvPhoto", TOKEN, kind, ref).then(function(src){ box.innerHTML = src ? '<img class="cam" alt="لقطة الكاميرا" src="'+src+'">' : '<div class="empty">مفيش لقطة.</div>'; })
+      .catch(function(err){ box.innerHTML = '<div class="status err">'+esc(errMsg(err))+'</div>'; });
+  }
+  $("#entryDlg").addEventListener("click", function(ev){
+    var b = ev.target.closest("button[data-cam]"); if(!b || !cur) return;
+    var kind = b.getAttribute("data-cam"), i = Number(b.getAttribute("data-i"));
+    showCam(b, kind, kind === "add" ? { id: cur.entry.id } : camRef(cur.checks[i]));
+  });
+  var CF = [], camPics = {};
+  function loadCctv(){
+    var s = $("#cStatus"); s.className = "status"; s.innerHTML = '<span class="spin"></span>';
+    var f = { sector: $("#cSector").value, unit: $("#cUnit").value.trim(), days: $("#cDays").value, missing: $("#cMissing").checked };
+    run("cctvFeed", TOKEN, f).then(function(r){
+      CF = r.items; camPics = {};
+      $("#cCount").textContent = r.done + " من " + r.total;
+      s.textContent = r.total ? (f.missing ? r.shown + " حركة مستنية لقطة" : r.total + " حركة · " + r.done + " ليها لقطة") + (r.shown > r.items.length ? " (أول " + r.items.length + ")" : "") : "";
+      $("#cList").innerHTML = CF.length ? CF.map(cctvCard).join("") : '<div class="empty">'+(f.missing ? "كل الحركات في الفترة دي ليها لقطات ✓" : "مفيش حركات في الفترة دي.")+'</div>';
+    }).catch(function(err){ s.className = "status err"; s.textContent = errMsg(err); });
+  }
+  function cctvCard(x, i){
+    var head = x.kind === "add" ? '<span class="pill p-blue">تسجيل حصر</span>' : '<span class="pill '+(x.status === "موجود" ? "p-green" : "p-red")+'">مرور: '+esc(x.status)+'</span>';
+    var up = '<div class="up"><label class="photo-in"><div class="pv" data-pv="'+i+'">اللقطة</div><input type="file" accept="image/*" data-pic="'+i+'" aria-label="لقطة الكاميرا"></label>' +
+      '<input data-note="'+i+'" placeholder="رقم الكاميرا / ملاحظة (اختياري)" value="'+esc(x.camNote || "")+'"><button class="sm solid" type="button" data-up="'+i+'">'+(x.hasCam ? "تغيير اللقطة" : "رفع اللقطة")+'</button></div>';
+    return '<div class="ccard'+(x.hasCam ? " done" : "")+'" data-i="'+i+'"><div class="t">'+head+' '+esc(x.item)+(x.qty ? ' × <span class="num">'+x.qty+'</span>' : "")+'</div>' +
+      '<div class="m"><span class="num">'+esc(x.unit)+'</span><span>'+bd(x.sector)+'</span><span>'+esc(x.by)+' ('+esc(x.role)+(x.company ? " — "+esc(x.company) : "")+')</span><span class="num">'+esc(x.date)+'</span></div>' +
+      (x.hasCam ? camLine(x, x.kind, i) + '<details><summary class="hint">تغيير اللقطة</summary>'+up+'</details>' : up) + '<div class="status err" data-msg="'+i+'"></div></div>';
+  }
+  ["#cGo"].forEach(function(s){ $(s).addEventListener("click", loadCctv); });
+  ["#cSector","#cDays","#cMissing"].forEach(function(s){ $(s).addEventListener("change", loadCctv); });
+  $("#cUnit").addEventListener("keydown", function(e){ if(e.key === "Enter") loadCctv(); });
+  $("#cList").addEventListener("change", function(e){
+    var inp = e.target.closest("input[data-pic]"); if(!inp || !inp.files[0]) return;
+    var i = inp.getAttribute("data-pic"), pv = $('#cList [data-pv="'+i+'"]');
+    shrink(inp.files[0], 1400, 0.75).then(function(d){ camPics[i] = d; pv.textContent = ""; pv.style.backgroundImage = "url('"+d+"')"; })
+      .catch(function(err){ $('#cList [data-msg="'+i+'"]').textContent = err.message; });
+  });
+  $("#cList").addEventListener("click", function(e){
+    var v = e.target.closest("button[data-cam]");
+    if(v){ var x = CF[Number(v.getAttribute("data-i"))]; showCam(v, x.kind, camRef(x)); return; }
+    var b = e.target.closest("button[data-up]"); if(!b) return;
+    var i = b.getAttribute("data-up"), x = CF[Number(i)], msg = $('#cList [data-msg="'+i+'"]');
+    if(!camPics[i]){ msg.textContent = "اختار صورة اللقطة الأول."; return; }
+    msg.textContent = ""; busy(b, true, "بيرفع…");
+    run("saveCctv", TOKEN, x.kind, camRef(x), camPics[i], $('#cList [data-note="'+i+'"]').value.trim()).then(function(){
+      toast("اترفعت لقطة الكاميرا ✓"); loadCctv();
+    }).catch(function(err){ msg.textContent = errMsg(err); busy(b, false, x.hasCam ? "تغيير اللقطة" : "رفع اللقطة"); });
+  });
+
   // ================================================================ patrol events / audits
   function loadEvents(){
     run("patrolEvents", TOKEN, 150).then(function(list){
-      $("#evTable").innerHTML = table(["التاريخ","بواسطة","الدور","الشركة","الوحدة / الصنف","الحالة"], list.map(function(p){ return ['<span class="num">'+esc(p.date)+'</span>', esc(p.by), esc(p.role), esc(p.company || "—"), '<span class="num">'+esc(p.unit)+'</span> — '+esc(p.item), '<span class="pill '+(p.status === "موجود" ? "p-green" : "p-red")+'">'+esc(p.status)+'</span>']; }), function(i){ return ' class="click" data-id="'+esc(list[i].id)+'"'; });
+      $("#evTable").innerHTML = table(["التاريخ","بواسطة","الدور","الشركة","الوحدة / الصنف","الحالة","الكاميرا"], list.map(function(p){ return ['<span class="num">'+esc(p.date)+'</span>', esc(p.by), esc(p.role), esc(p.company || "—"), '<span class="num">'+esc(p.unit)+'</span> — '+esc(p.item), '<span class="pill '+(p.status === "موجود" ? "p-green" : "p-red")+'">'+esc(p.status)+'</span>', p.hasCam ? '<span class="pill p-green">📷 فيه لقطة</span>' : '<span class="pill p-grey">مفيش</span>']; }), function(i){ return ' class="click" data-id="'+esc(list[i].id)+'"'; });
     }).catch(function(err){ toast(errMsg(err)); });
   }
   $("#csvPatrols").addEventListener("click", function(){ run("exportPatrols", TOKEN).then(function(rows){ csvDownload(rows, "إشعارات_المرور"); }).catch(function(err){ toast(errMsg(err)); }); });
@@ -792,7 +886,7 @@ dialog form,dialog .body{padding:16px;display:grid;gap:12px}
     run("savePerms", TOKEN, map).then(function(d){ AD = d; drawAdmin(); toast("اتحفظت الصلاحيات."); }).catch(function(err){ toast(errMsg(err)); }).then(function(){ busy(b, false, "حفظ الصلاحيات"); });
   });
   $("#permReset").addEventListener("click", function(){
-    var def = { add:["guard"], review:["supervisor"], patrol:["guard","general_supervisor","company_manager"], dash:["supervisor","general_supervisor","company_manager","emaar"], viewAll:["supervisor","general_supervisor","company_manager","emaar"], events:["emaar"], auditsView:["supervisor","general_supervisor","company_manager","emaar"], audit:["emaar"], export:["emaar"], edit:[] };
+    var def = { add:["guard"], review:["supervisor"], patrol:["guard","general_supervisor","company_manager"], dash:["supervisor","general_supervisor","company_manager","emaar"], viewAll:["supervisor","general_supervisor","company_manager","emaar"], events:["emaar"], auditsView:["supervisor","general_supervisor","company_manager","emaar"], audit:["emaar"], export:["emaar"], edit:[], cctv:["cctv"] };
     drawPerms(def); toast("اتعلّم على الافتراضي. دوس «حفظ الصلاحيات» علشان يتطبّق.");
   });
   function drawSecs(sel){

@@ -7,7 +7,7 @@ App link: **https://ziedomar696.github.io/matrokat/**
 - `index.html`, `manifest.webmanifest`, `sw.js`, `icons/`: the installable app (GitHub Pages).
   `APP_URL` in `index.html` points at the Apps Script `/exec` link.
 
-Roles: فرد الأمن, المشرف, المشرف العام, مدير شركة الأمن, مشرف أمن إعمار, المكتب الرئيسي.
+Roles: فرد الأمن, المشرف, المشرف العام, مدير شركة الأمن, مشرف أمن إعمار, مراقب CCTV (بيرفع لقطة كاميرا لكل حصر ومرور), المكتب الرئيسي.
 Workflow: guard records → supervisor approves (= final match) or rejects → periodic patrol (موجود / مفقود / تالف).
 
 Updating: paste the new Code.gs / Index.html into the Apps Script project (keep your `SETUP_CODE`),

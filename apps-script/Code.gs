@@ -18,11 +18,13 @@ const USERS_SHEET = 'المستخدمين';
 const LISTS_SHEET = 'القوائم';
 const SETTINGS_SHEET = 'الإعدادات';
 
+const CAM_HEADERS = ['لقطة الكاميرا (Drive ID)', 'لقطة الكاميرا بواسطة', 'تاريخ لقطة الكاميرا', 'ملاحظات الكاميرا'];
 const E_HEADERS = ['رقم القيد', 'رقم الوحدة', 'القطاع', 'الصنف', 'الكمية', 'ملاحظات فرد الأمن', 'فرد الأمن', 'حساب فرد الأمن', 'تاريخ الحصر',
   'حالة المشرف', 'المشرف', 'تاريخ المراجعة', 'حالة المطابقة', 'تاريخ المطابقة',
-  'الحالة الميدانية', 'آخر مرور', 'آخر مرور بواسطة', 'آخر تعديل', 'محذوف', 'صورة (Drive ID)'];
+  'الحالة الميدانية', 'آخر مرور', 'آخر مرور بواسطة', 'آخر تعديل', 'محذوف', 'صورة (Drive ID)'].concat(CAM_HEADERS);
 const EC = {}; E_HEADERS.forEach(function (h, i) { EC[h] = i; });
-const P_HEADERS = ['رقم القيد', 'الوحدة', 'القطاع', 'الصنف', 'التاريخ', 'بواسطة', 'الحساب', 'الدور', 'الشركة', 'الحالة'];
+const P_HEADERS = ['رقم القيد', 'الوحدة', 'القطاع', 'الصنف', 'التاريخ', 'بواسطة', 'الحساب', 'الدور', 'الشركة', 'الحالة'].concat(CAM_HEADERS);
+const PC = {}; P_HEADERS.forEach(function (h, i) { PC[h] = i; });
 const A_HEADERS = ['التاريخ', 'مشرف أمن إعمار', 'الحساب', 'القطاع', 'الوحدة', 'التقييم', 'ملاحظات'];
 const L_HEADERS = ['التاريخ', 'الحساب', 'رقم القيد', 'الحقل', 'من', 'إلى'];
 const U_HEADERS = ['اسم المستخدم', 'الاسم', 'الدور', 'الشركة', 'نشط', 'آخر دخول', 'تاريخ الإنشاء', 'الإيميل', 'salt', 'hash', 'ver', 'القطاعات'];
@@ -30,7 +32,7 @@ const LIST_HEADERS = ['القائمة', 'القيمة', 'نشط', 'صورة (Dri
 
 const ROLES = {
   guard: 'فرد الأمن', supervisor: 'المشرف', general_supervisor: 'المشرف العام',
-  company_manager: 'مدير شركة الأمن', emaar: 'مشرف أمن إعمار', admin: 'المكتب الرئيسي'
+  company_manager: 'مدير شركة الأمن', emaar: 'مشرف أمن إعمار', cctv: 'مراقب CCTV', admin: 'المكتب الرئيسي'
 };
 const SUP = { pending: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض' };
 const HO = { waiting: 'بانتظار المطابقة', done: 'تمت المطابقة', none: '—' };
@@ -48,7 +50,8 @@ const PERMS = {
   auditsView: 'عرض زيارات التدقيق',
   audit: 'تسجيل زيارة تدقيق',
   export: 'تحميل Excel',
-  edit: 'تعديل ومسح القيود'
+  edit: 'تعديل ومسح القيود',
+  cctv: 'رفع لقطات الكاميرات (CCTV)'
 };
 const DEFAULT_CAN = {
   add: ['guard'],
@@ -60,7 +63,8 @@ const DEFAULT_CAN = {
   auditsView: ['supervisor', 'general_supervisor', 'company_manager', 'emaar'],
   audit: ['emaar'],
   export: ['emaar'],
-  edit: []
+  edit: [],
+  cctv: ['cctv']
 };
 const PERMS_KEY = 'الصلاحيات';
 
@@ -91,6 +95,7 @@ function setup() {
   entriesSheet_(); patrolsSheet_(); auditsSheet_(); editsSheet_(); usersSheet_(); listsSheet_(); settingsSheet_();
   folder_('PHOTOS_FOLDER', 'متروكات - صور القيود');
   folder_('CATALOG_FOLDER', 'متروكات - صور الأصناف');
+  folder_('CCTV_FOLDER', CCTV_FOLDER_NAME);
   const keep = [ENTRIES_SHEET, PATROLS_SHEET, AUDITS_SHEET, EDITS_SHEET, USERS_SHEET, LISTS_SHEET, SETTINGS_SHEET];
   ss.getSheets().forEach(function (s) {
     if (keep.indexOf(s.getName()) < 0 && s.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(s);
@@ -495,7 +500,9 @@ function rowToEntry_(r, row) {
     supStatus: String(r[EC['حالة المشرف']] || SUP.pending), supName: String(r[EC['المشرف']] || ''), supDate: String(r[EC['تاريخ المراجعة']] || ''),
     hoStatus: String(r[EC['حالة المطابقة']] || HO.waiting), hoDate: String(r[EC['تاريخ المطابقة']] || ''),
     flag: String(r[EC['الحالة الميدانية']] || ''), lastCheck: String(r[EC['آخر مرور']] || ''), lastCheckBy: String(r[EC['آخر مرور بواسطة']] || ''),
-    edited: String(r[EC['آخر تعديل']] || ''), hasPhoto: !!String(r[EC['صورة (Drive ID)']] || '').trim(), photoId: String(r[EC['صورة (Drive ID)']] || '')
+    edited: String(r[EC['آخر تعديل']] || ''), hasPhoto: !!String(r[EC['صورة (Drive ID)']] || '').trim(), photoId: String(r[EC['صورة (Drive ID)']] || ''),
+    camId: String(r[EC['لقطة الكاميرا (Drive ID)']] || '').trim(), camBy: String(r[EC['لقطة الكاميرا بواسطة']] || ''),
+    camAt: String(r[EC['تاريخ لقطة الكاميرا']] || ''), camNote: String(r[EC['ملاحظات الكاميرا']] || '')
   };
 }
 function liveRow_(r) { return r[EC['رقم القيد']] && !String(r[EC['محذوف']] || '').trim(); }
@@ -520,7 +527,7 @@ function entry_(id) {
   return liveRow_(r) ? rowToEntry_(r, row) : null;
 }
 function clientEntry_(e) {
-  const o = Object.assign({}, e); delete o.row; delete o.photoId;
+  const o = Object.assign({}, e); delete o.row; delete o.photoId; o.hasCam = !!e.camId; delete o.camId;
   o.verified = e.hoStatus === HO.done;
   o.daysSince = daysSince_(e.lastCheck || e.hoDate);
   o.overdue = o.verified && o.daysSince !== null && o.daysSince > overdueDays_();
@@ -657,19 +664,21 @@ function myPatrols(token) {
   const u = auth_(token, 'patrol');
   const sh = patrolsSheet_(), last = sh.getLastRow();
   const rows = values_(sh, P_HEADERS.length, Math.max(2, last - 1999));
-  return rows.reverse().filter(function (r) { return r[6] === u.username; }).slice(0, 30).map(patrolObj_);
+  return rows.reverse().filter(function (r) { return r[6] === u.username; }).slice(0, 30).map(function (r) { return patrolObj_(r); });
 }
-function patrolObj_(r) {
-  return { id: String(r[0]), unit: String(r[1]), sector: String(r[2]), item: String(r[3]), date: String(r[4]), by: String(r[5]), role: String(r[7]), company: String(r[8] || ''), status: String(r[9]) };
+function patrolObj_(r, row) {
+  return { id: String(r[0]), unit: String(r[1]), sector: String(r[2]), item: String(r[3]), date: String(r[4]), by: String(r[5]), role: String(r[7]), company: String(r[8] || ''), status: String(r[9]),
+    row: row || 0, hasCam: !!String(r[PC['لقطة الكاميرا (Drive ID)']] || '').trim(), camBy: String(r[PC['لقطة الكاميرا بواسطة']] || ''),
+    camAt: String(r[PC['تاريخ لقطة الكاميرا']] || ''), camNote: String(r[PC['ملاحظات الكاميرا']] || '') };
 }
 
 function patrolEvents(token, limit) {
   const u = auth_(token, 'events');
   const sh = patrolsSheet_(), last = sh.getLastRow();
   limit = Math.min(Number(limit) || 40, 500);
-  const span = scope_(u) ? limit * 10 : limit;
-  return values_(sh, P_HEADERS.length, Math.max(2, last - span + 1)).reverse()
-    .filter(function (r) { return inScope_(u, r[2]); }).slice(0, limit).map(patrolObj_);
+  const span = scope_(u) ? limit * 10 : limit, from = Math.max(2, last - span + 1);
+  return values_(sh, P_HEADERS.length, from).map(function (r, i) { return patrolObj_(r, from + i); }).reverse()
+    .filter(function (p) { return inScope_(u, p.sector); }).slice(0, limit);
 }
 
 /** لوحة المتابعة: الأرقام، الالتزام، التوزيع، والتنبيهات. */
@@ -722,7 +731,7 @@ function getEntry(token, id) {
   mustSee_(u, e);
   const psh = patrolsSheet_();
   const checks = psh.getLastRow() < 2 ? [] : psh.getRange(2, 1, psh.getLastRow() - 1, 1).createTextFinder(e.id).matchEntireCell(true).findAll()
-    .map(function (c) { return patrolObj_(psh.getRange(c.getRow(), 1, 1, P_HEADERS.length).getValues()[0].map(fmt_)); }).reverse();
+    .map(function (c) { return patrolObj_(psh.getRange(c.getRow(), 1, 1, P_HEADERS.length).getValues()[0].map(fmt_), c.getRow()); }).reverse();
   let edits = [];
   if (u.role === 'admin') {
     const esh = editsSheet_();
@@ -736,7 +745,7 @@ function getEntry(token, id) {
 function mustSee_(u, e) {
   const deny = function () { throw new Error('مش مسموح لحسابك تشوف القيد ده.'); };
   if (!inScope_(u, e.sector) && e.guardUser !== u.username) deny();
-  if (['viewAll', 'dash', 'review', 'edit', 'events'].some(function (k) { return can_(u, k); })) return;
+  if (['viewAll', 'dash', 'review', 'edit', 'events', 'cctv'].some(function (k) { return can_(u, k); })) return;
   if (e.guardUser !== u.username && e.hoStatus !== HO.done) deny();
 }
 function entryPhoto(token, id) {
@@ -817,21 +826,98 @@ function listAudits(token) {
     .map(function (r) { return { date: String(r[0]), by: String(r[1]), sector: String(r[3]), unit: String(r[4]), rating: String(r[5]), notes: String(r[6]) }; });
 }
 
+// ================================================================ CCTV
+
+const CCTV_FOLDER_NAME = 'متروكات - لقطات الكاميرات';
+
+/** قايمة الحركات (تسجيل حصر + مرور دوري) في قطاعات المراقب، علشان يرفع لقطة الكاميرا لكل واحدة. */
+function cctvFeed(token, f) {
+  const u = auth_(token, 'cctv');
+  f = f || {};
+  const days = Math.min(Math.max(Number(f.days) || 3, 1), 31);
+  const t = dayKey_(new Date(Date.now() - (days - 1) * 864e5));
+  const unit = String(f.unit || '').trim().toLowerCase(), sector = String(f.sector || ''), missing = !!f.missing;
+  const ok = function (x) {
+    return x.date >= t && inScope_(u, x.sector) && (!sector || x.sector === sector) && (!unit || x.unit.toLowerCase().indexOf(unit) >= 0);
+  };
+  const out = [];
+  entries_().forEach(function (e) {
+    const x = { kind: 'add', id: e.id, date: e.guardDate, by: e.guardName, role: ROLES.guard, unit: e.unit, sector: e.sector, item: e.item, qty: e.qty,
+      status: e.supStatus, hasCam: !!e.camId, camBy: e.camBy, camAt: e.camAt, camNote: e.camNote };
+    if (ok(x)) out.push(x);
+  });
+  const sh = patrolsSheet_(), last = sh.getLastRow(), from = Math.max(2, last - 4999);
+  values_(sh, P_HEADERS.length, from).forEach(function (r, i) {
+    const p = patrolObj_(r, from + i); p.kind = 'patrol';
+    if (ok(p)) out.push(p);
+  });
+  out.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+  const done = out.filter(function (x) { return x.hasCam; }).length;
+  const list = missing ? out.filter(function (x) { return !x.hasCam; }) : out;
+  return { total: out.length, done: done, shown: list.length, items: list.slice(0, 200) };
+}
+
+/** بيلاقي الحركة ويتأكد إنها هي (رقم الصف لوحده مش كفاية لو حد لعب في الشيت). */
+function cctvTarget_(kind, ref) {
+  ref = ref || {};
+  if (kind === 'add') {
+    const e = entry_(ref.id);
+    if (!e) throw new Error('القيد ده مش موجود.');
+    return { sh: entriesSheet_(), row: e.row, col: EC, sector: e.sector, camId: e.camId, entry: e, name: e.id + '_حصر' };
+  }
+  if (kind === 'patrol') {
+    const sh = patrolsSheet_(), row = Number(ref.row);
+    if (!(row >= 2 && row <= sh.getLastRow())) throw new Error('حركة المرور دي مش موجودة.');
+    const r = sh.getRange(row, 1, 1, P_HEADERS.length).getValues()[0].map(fmt_);
+    if (String(r[0]) !== String(ref.id) || String(r[4]) !== String(ref.date)) throw new Error('حركة المرور دي اتغيّرت. حدّث الصفحة.');
+    const e = entry_(r[0]);
+    return { sh: sh, row: row, col: PC, sector: String(r[2]), camId: String(r[PC['لقطة الكاميرا (Drive ID)']] || '').trim(), entry: e,
+      name: r[0] + '_مرور_' + String(r[4]).replace(/\D/g, '') };
+  }
+  throw new Error('نوع الحركة غير صحيح.');
+}
+
+function saveCctv(token, kind, ref, photo, note) {
+  const u = auth_(token, 'cctv');
+  if (!photo) throw new Error('اختار صورة اللقطة.');
+  let x;
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    x = cctvTarget_(kind, ref);
+    mustScope_(u, x.sector);
+    const id = savePhoto_(photo, 'CCTV_FOLDER', CCTV_FOLDER_NAME, x.name);
+    if (!id) throw new Error('الصورة مش مقروءة. جرّب صورة تانية.');
+    const by = u.name + ' (' + ROLES[u.role] + ')', now = stamp_(new Date());
+    x.sh.getRange(x.row, x.col['لقطة الكاميرا (Drive ID)'] + 1, 1, 4).setValues([[id, by, "'" + now, clean_(note, 300)]]);
+    if (x.camId) { try { DriveApp.getFileById(x.camId).setTrashed(true); } catch (err) {} }
+  } finally { lock.releaseLock(); }
+  return { ok: true };
+}
+
+function cctvPhoto(token, kind, ref) {
+  const u = auth_(token);
+  const x = cctvTarget_(kind, ref);
+  if (x.entry) mustSee_(u, x.entry); else mustScope_(u, x.sector);
+  if (!x.camId) return '';
+  return 'data:image/jpeg;base64,' + Utilities.base64Encode(DriveApp.getFileById(x.camId).getBlob().getBytes());
+}
+
 // ================================================================ exports (CSV)
 
 function exportEntries(token, f) {
   const u = auth_(token, 'export');
   const head = ['رقم القيد', 'رقم الوحدة', 'القطاع', 'الصنف', 'الكمية', 'فرد الأمن', 'تاريخ الحصر', 'حالة المشرف', 'اسم المشرف', 'تاريخ المراجعة',
-    'حالة المطابقة', 'تاريخ المطابقة', 'الحالة الميدانية', 'آخر مرور', 'آخر مرور بواسطة', 'له صورة', 'ملاحظات فرد الأمن'];
+    'حالة المطابقة', 'تاريخ المطابقة', 'الحالة الميدانية', 'آخر مرور', 'آخر مرور بواسطة', 'له صورة', 'ملاحظات فرد الأمن', 'لقطة كاميرا للحصر'];
   return [head].concat(scopedEntries_(u).filter(function (e) { return matches_(e, f); }).map(function (e) {
     return [e.id, e.unit, e.sector, e.item, e.qty, e.guardName, e.guardDate, e.supStatus, e.supName, e.supDate, e.hoStatus, e.hoDate,
-      e.flag || 'سليم', e.lastCheck, e.lastCheckBy, e.hasPhoto ? 'نعم' : 'لا', e.notes];
+      e.flag || 'سليم', e.lastCheck, e.lastCheckBy, e.hasPhoto ? 'نعم' : 'لا', e.notes, e.camId ? 'نعم' : 'لا'];
   }));
 }
 function exportPatrols(token) {
   const u = auth_(token, 'export');
-  return [['رقم القيد', 'التاريخ', 'بواسطة', 'الدور', 'الشركة', 'الوحدة', 'القطاع', 'الصنف', 'الحالة']].concat(
-    values_(patrolsSheet_(), P_HEADERS.length).reverse().filter(function (r) { return inScope_(u, r[2]); }).map(function (r) { return [r[0], r[4], r[5], r[7], r[8], r[1], r[2], r[3], r[9]]; }));
+  return [['رقم القيد', 'التاريخ', 'بواسطة', 'الدور', 'الشركة', 'الوحدة', 'القطاع', 'الصنف', 'الحالة', 'لقطة الكاميرا', 'لقطة بواسطة', 'ملاحظات الكاميرا']].concat(
+    values_(patrolsSheet_(), P_HEADERS.length).reverse().filter(function (r) { return inScope_(u, r[2]); }).map(function (r) {
+      return [r[0], r[4], r[5], r[7], r[8], r[1], r[2], r[3], r[9], String(r[PC['لقطة الكاميرا (Drive ID)']] || '').trim() ? 'نعم' : 'لا', r[PC['لقطة الكاميرا بواسطة']], r[PC['ملاحظات الكاميرا']]]; }));
 }
 function exportAudits(token) {
   const u = auth_(token, 'export');
