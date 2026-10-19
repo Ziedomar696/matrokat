@@ -156,6 +156,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 .tagset{display:flex;flex-wrap:wrap;gap:8px}
 .tagitem{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:4px 6px 4px 12px;background:var(--surface-2)}
 .tagitem.off{opacity:.6}
+.tagitem select{width:auto;padding:3px 8px;font-size:12.5px;min-height:0}
 .perm td,.perm th{text-align:center}.perm td:first-child,.perm th:first-child{text-align:start;position:sticky;inset-inline-start:0;background:var(--surface)}
 .perm input{width:20px;height:20px;accent-color:var(--navy,#16233F)}
 .secpick{display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px}
@@ -224,7 +225,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   <!-- تسجيل حصر -->
   <section class="card" data-v="add" hidden>
     <h2>تسجيل حصر جديد</h2>
-    <p class="hint">سجّل العناصر المتروكة بالوحدة بعد نهاية الموسم. العنصر يفضل في مكانه، والتسجيل ده بس لحصره ومطابقته، وبيتبعت للمشرف يراجعه.</p>
+    <p class="hint">سجّل العناصر المتروكة بالوحدة بعد نهاية الموسم. العنصر يفضل في مكانه، والتسجيل ده بس لحصره، وبيدخل المرور الدوري على طول.</p>
     <form id="addForm" class="fields" autocomplete="off">
       <label class="f">رقم الوحدة<input id="aUnit" placeholder="مثال: REZZO-014" dir="ltr" style="text-align:right" autocapitalize="characters"></label>
       <label class="f">القطاع<select id="aSector"></select></label>
@@ -242,7 +243,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   <section data-v="review" style="display:grid;gap:14px" hidden>
     <div class="card">
       <h2>بانتظار مراجعتك <span class="chip" id="rvCount"></span></h2>
-      <p class="hint">اعتماد أو رفض العناصر المسجلة من أفراد الأمن. اعتمادك هو المطابقة النهائية على العنصر مباشرة، واسمك بيتسجل كتوقيع.</p>
+      <p class="hint">القيود القديمة اللي اتسجلت قبل نظام الأدوار الجديد ولسه مستنية اعتماد. القيود الجديدة بتدخل المرور الدوري على طول.</p>
       <div class="plist" id="rvList"></div>
     </div>
     <div class="card"><h2>آخر المراجعات</h2><div id="rvDone"></div></div>
@@ -256,6 +257,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <div class="bar-row">
         <label class="f">القطاع<select id="pSector"></select></label>
         <label class="f grow">رقم الوحدة (اختياري)<input id="pUnit" dir="ltr" style="text-align:right" placeholder="REZZO-014"></label>
+        <label class="chk" id="pMineRow" hidden><input type="checkbox" id="pMineOnly"> اللي سجّلته أنا بس</label>
         <button class="solid" id="pGo" type="button">عرض</button>
       </div>
       <div class="status" id="pStatus"></div>
@@ -285,7 +287,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   <section class="card" data-v="all" hidden>
     <h2>كل القيود</h2>
     <div class="bar-row">
-      <label class="f grow">بحث بالوحدة أو الصنف أو فرد الأمن أو رقم القيد<input id="fQ" type="search"></label>
+      <label class="f grow">بحث بالوحدة أو الصنف أو مشرف الأمن أو رقم القيد<input id="fQ" type="search"></label>
       <label class="f">القطاع<select id="fSector"></select></label>
       <label class="f">الحالة<select id="fStatus"></select></label>
     </div>
@@ -330,7 +332,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   <!-- لقطات الكاميرات -->
   <section class="card" data-v="cctv" hidden>
     <h2>لقطات الكاميرات <span class="chip" id="cCount"></span></h2>
-    <p class="hint">كل تسجيل حصر وكل مرور دوري بيظهر هنا. ارفع لكل حركة لقطة من الكاميرا للشخص اللي دخل الوحدة، علشان يبقى فيه إثبات بالصورة مين دخل وإمتى.</p>
+    <p class="hint">كل مرة مشرف الأمن أو المشرف العام أو ظابط الوردية أو مشرف إعمار يدخل وحدة (يسجّل أو يمر)، الزيارة بتظهر هنا. ارفع لقطة واحدة من الكاميرا للزيارة كلها بعد ما يخلص الوحدة.</p>
     <div class="bar-row">
       <label class="f">القطاع<select id="cSector"></select></label>
       <label class="f grow">رقم الوحدة (اختياري)<input id="cUnit" dir="ltr" style="text-align:right" placeholder="REZZO-014"></label>
@@ -345,7 +347,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   <!-- كتالوج -->
   <section class="card" data-v="catalog" hidden>
     <h2>كتالوج صور الأصناف <span class="chip" id="catCount"></span></h2>
-    <p class="hint">ارفع صورة مرجعية لكل صنف، وهتظهر لفرد الأمن وهو بيختار الصنف علشان يتأكد إنه بيسجّل الحاجة الصح. اضغط على أي صنف علشان ترفع أو تغيّر صورته.</p>
+    <p class="hint">ارفع صورة مرجعية لكل صنف، وهتظهر لمشرف الأمن وهو بيختار الصنف علشان يتأكد إنه بيسجّل الحاجة الصح. اضغط على أي صنف علشان ترفع أو تغيّر صورته.</p>
     <div class="catalog" id="catGrid"></div>
   </section>
 
@@ -370,7 +372,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     </form>
     <div class="card">
       <h2>القوايم</h2>
-      <h3>القطاعات</h3><div class="tagset" id="lsSector"></div>
+      <h3>القطاعات</h3><p class="hint">اختار الشركة المسؤولة عن كل قطاع، علشان ظابط الوردية يشوف قطاعات شركته بس.</p><div class="tagset" id="lsSector"></div>
       <form class="bar-row" data-kind="sector"><label class="f grow">قطاع جديد<input></label><button class="solid" type="submit">إضافة</button></form>
       <h3>الأصناف</h3><div class="tagset" id="lsItem"></div>
       <form class="bar-row" data-kind="item"><label class="f grow">صنف جديد<input></label><button class="solid" type="submit">إضافة</button></form>
@@ -403,7 +405,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
         <label class="f">حالة المشرف<select id="edSup"></select></label>
         <label class="f">حالة المطابقة<select id="edHo"></select></label>
         <label class="f">الحالة الميدانية<select id="edFlag"><option value="">سليم</option><option>مفقود</option><option>تالف</option></select></label>
-        <label class="f wide">ملاحظات فرد الأمن<textarea id="edNotes"></textarea></label>
+        <label class="f wide">ملاحظات مشرف الأمن<textarea id="edNotes"></textarea></label>
       </div>
       <div class="actions"><button class="solid" id="edSave">حفظ التعديل</button><button class="bad" type="button" id="edDelete">مسح القيد</button></div>
     </form>
@@ -418,6 +420,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     <label class="f">اسم المستخدم (إنجليزي صغير أو أرقام)<input id="uUser" dir="ltr" autocapitalize="none" spellcheck="false" placeholder="m.diab"></label>
     <label class="f">الدور<select id="uRole"></select></label>
     <label class="f" id="uCompanyRow">الشركة<select id="uCompany"></select></label>
+    <p class="hint" id="uCompanyHint" hidden>ظابط الوردية بيشوف القطاعات اللي تبع شركته بس. حدد شركة كل قطاع من «القوايم» تحت.</p>
     <label class="f" id="uEmailRow">الإيميل (بيوصله تنبيه المفقود والتالف)<input id="uEmail" type="email" dir="ltr" placeholder="name@gmail.com"></label>
     <div class="f" id="uSecRow"><span>القطاعات اللي يشوفها</span>
       <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="uAllSec" style="width:auto"> كل القطاعات</label>
@@ -452,7 +455,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   var $ = function(s){ return document.querySelector(s); };
   var $$ = function(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var store = { get: function(k){ try{ return localStorage.getItem(k) || ""; }catch(e){ return ""; } }, set: function(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
-  var ROLE_LABEL = { guard:"فرد الأمن", supervisor:"المشرف", general_supervisor:"المشرف العام", company_manager:"مدير شركة الأمن", emaar:"مشرف أمن إعمار", cctv:"مراقب CCTV", admin:"المكتب الرئيسي" };
+  var ROLE_LABEL = { sec_sup:"مشرف الأمن", general_supervisor:"المشرف العام", shift_officer:"ظابط الوردية", emaar:"مشرف أمن إعمار", cctv:"مراقب CCTV", admin:"المكتب الرئيسي" };
   // التابات بتظهر على حسب الصلاحيات اللي المكتب الرئيسي محددها
   function tabsFor(b){
     var c = b.can, t = [];
@@ -469,7 +472,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(b.me.role === "admin") t.push("catalog", "admin");
     return t;
   }
-  var ROLE_ORDER = ["guard","supervisor","general_supervisor","company_manager","emaar","cctv"];
+  var ROLE_ORDER = ["sec_sup","general_supervisor","shift_officer","emaar","cctv"];
   var TOKEN = store.get("mt.token"), B = null;
 
   // ---------- server (retries when Google is busy) ----------
@@ -530,7 +533,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       rows.map(function(r, i){ return "<tr"+(rowAttrs ? rowAttrs(i) : "")+">"+r.map(function(c){ return "<td>"+c+"</td>"; }).join("")+"</tr>"; }).join("") + '</tbody></table></div>';
   }
   function entryRows(list){ return list.map(function(e){ return ['<span class="num">'+esc(e.unit)+'</span>', bd(e.sector), esc(e.item)+(e.hasPhoto ? " 📷" : "")+" "+flagPill(e.flag), '<span class="num">'+e.qty+'</span>', esc(e.guardName), supPill(e.supStatus), hoPill(e.hoStatus)]; }); }
-  var ENTRY_HEADS = ["الوحدة","القطاع","الصنف","الكمية","فرد الأمن","حالة المشرف","حالة المطابقة"];
+  var ENTRY_HEADS = ["الوحدة","القطاع","الصنف","الكمية","سجّله","حالة المشرف","حالة المطابقة"];
 
   // ================================================================ login
   function showLock(mode){
@@ -584,7 +587,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     options($("#pSector"), B.sectors, "اختار القطاع", store.get("mt.psector")); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); options($("#cSector"), B.sectors, "كل القطاعات");
     $("#fStatus").innerHTML = '<option value="">كل الحالات</option>' + ["قيد المراجعة","معتمد","مرفوض","تمت المطابقة"].map(function(s){ return "<option>"+s+"</option>"; }).join("") + '<option value="flagged">بلاغات (مفقود / تالف)</option>';
     $("#auRating").innerHTML = B.ratings.map(function(r){ return "<option>"+esc(r)+"</option>"; }).join("");
-    $("#auditForm").hidden = !B.can.audit;
+    $("#auditForm").hidden = !B.can.audit; $("#pMineRow").hidden = !B.can.add;
     ["#csvEntries","#copyEntries","#csvPatrols","#csvAudits"].forEach(function(s){ $(s).hidden = !B.can.export; });
     showView(tabs[0]);
     if(B.can.dash) loadAlerts();
@@ -596,12 +599,12 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
   function drawAlerts(d){
     var h = "";
-    if(d.flaggedList.length) h += '<div class="alert red"><b>⚠ يوجد '+d.flagged+' بلاغ يحتاج متابعة فورية</b><ul>' + d.flaggedList.map(function(e){ return "<li>"+esc(e.item)+" — وحدة "+esc(e.unit)+" ("+bd(e.sector)+") — "+esc(e.flag)+" — آخر مرور: "+esc(e.lastCheck || "—")+" "+esc(e.lastCheckBy)+"</li>"; }).join("") + '</ul></div>';
+    if(d.flaggedList.length) h += '<div class="alert red"><b>⚠ يوجد '+d.flagged+' بلاغ يحتاج متابعة فورية</b><ul>' + d.flaggedList.map(function(e){ return "<li>"+esc(e.item)+" — وحدة "+esc(e.unit)+" ("+bd(e.sector)+") — "+esc(e.flag)+" — آخر مرور: <span class=\"num\">"+esc(e.lastCheck || "—")+"</span> "+esc(e.lastCheckBy)+"</li>"; }).join("") + '</ul></div>';
     if(d.overdueList.length) h += '<div class="alert amber"><b>⏱ '+d.overdueCount+' عنصر متأخر عليه مرور دوري (أكتر من '+d.overdueDays+' أيام)</b><ul>' + d.overdueList.map(function(e){ return "<li>"+esc(e.item)+" — وحدة "+esc(e.unit)+" ("+bd(e.sector)+") — من "+e.daysSince+" يوم من غير مرور</li>"; }).join("") + '</ul></div>';
     $("#alerts").innerHTML = h;
   }
 
-  // ================================================================ add entry (guard)
+  // ================================================================ add entry (مشرف الأمن)
   var aPhoto = null, refCache = {};
   function loadAdd(){}
   $("#aItem").addEventListener("change", function(){
@@ -623,7 +626,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(!d.item){ $("#aMsg").textContent = "اختار الصنف."; return; }
     var b = $("#aSave"); busy(b, true, "بيسجّل…"); $("#aMsg").textContent = "";
     run("addEntry", TOKEN, d, aPhoto).then(function(r){
-      toast("اتسجل الحصر (" + r.id + ") واتبعت للمشرف.");
+      toast("اتسجل الحصر (" + r.id + ") ودخل المرور الدوري.");
       $("#aItem").value = ""; $("#aQty").value = 1; $("#aNotes").value = ""; $("#aRef").hidden = true; aPhoto = null; var pv = $("#aPv"); pv.style.backgroundImage = ""; pv.textContent = "مفيش صورة";
     }).catch(function(err){ $("#aMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "تسجيل الحصر"); });
   });
@@ -635,7 +638,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     }).catch(function(err){ toast(errMsg(err)); });
   }
 
-  // ================================================================ review (supervisor)
+  // ================================================================ review (قيود قديمة)
   function loadReview(){
     $("#rvList").innerHTML = '<div class="empty">بيحمّل…</div>';
     run("reviewList", TOKEN).then(drawReview).catch(function(err){ toast(errMsg(err)); });
@@ -667,10 +670,10 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var sec = $("#pSector").value, s = $("#pStatus");
     if(!sec){ $("#pList").innerHTML = '<div class="empty">اختار القطاع الأول لعرض عناصر المرور الخاصة بيه.</div>'; return; }
     store.set("mt.psector", sec); s.className = "status"; s.innerHTML = '<span class="spin"></span>';
-    run("patrolList", TOKEN, sec, $("#pUnit").value.trim()).then(function(list){
+    run("patrolList", TOKEN, sec, $("#pUnit").value.trim(), B.can.add && $("#pMineOnly").checked).then(function(list){
       s.textContent = list.length + " عنصر معتمد";
       $("#pList").innerHTML = list.length ? list.map(function(e){
-        var last = e.lastCheck ? "آخر مرور: " + esc(e.lastCheck) + " — " + esc(e.lastCheckBy) : "لسه مفيش مرور";
+        var last = e.lastCheck ? 'آخر مرور: <span class="num">' + esc(e.lastCheck) + "</span> — " + esc(e.lastCheckBy) : "لسه مفيش مرور";
         return '<div class="pcard'+(e.flag ? " flag" : e.overdue ? " late" : "")+'"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span> '+flagPill(e.flag)+(e.overdue ? ' <span class="pill p-amber">متأخر ⏱</span>' : "")+'</div>' +
           '<div class="m"><span class="num">'+esc(e.unit)+'</span><span>'+bd(e.sector)+'</span><span>'+last+'</span></div></div>' +
           '<div class="btns"><button class="sm ok" type="button" data-p="موجود" data-id="'+esc(e.id)+'">لسه موجود</button><button class="sm bad" type="button" data-p="مفقود" data-id="'+esc(e.id)+'">مفقود</button><button class="sm warn" type="button" data-p="تالف" data-id="'+esc(e.id)+'">تالف</button></div></div>';
@@ -679,6 +682,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
   $("#pGo").addEventListener("click", loadPatrol);
   $("#pSector").addEventListener("change", loadPatrol);
+  $("#pMineOnly").addEventListener("change", loadPatrol);
   var armed = null;
   $("#pList").addEventListener("click", function(e){
     var b = e.target.closest("button[data-p]"); if(!b) return;
@@ -739,11 +743,11 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $("#eId").textContent = e.id; $("#eTitle").innerHTML = esc(e.item) + " × " + e.qty + " " + flagPill(e.flag);
     $("#ePhoto").innerHTML = e.hasPhoto ? '<div class="ph-wait">بيحمّل الصورة…</div>' : "";
     if(e.hasPhoto) run("entryPhoto", TOKEN, e.id).then(function(src){ if(cur && cur.entry.id === e.id) $("#ePhoto").innerHTML = src ? '<img class="big-photo" alt="صورة '+esc(e.id)+'" src="'+src+'">' : ""; }).catch(function(){});
-    var kv = [["الوحدة", e.unit + " · \u2068" + e.sector + "\u2069"], ["فرد الأمن", e.guardName + " · " + e.guardDate], ["ملاحظات", e.notes], ["حالة المشرف", e.supStatus + (e.supName ? " — " + e.supName + " · " + e.supDate : "")],
+    var kv = [["الوحدة", e.unit + " · \u2068" + e.sector + "\u2069"], ["سجّله", e.guardName + " · " + e.guardDate], ["ملاحظات", e.notes], ["حالة المشرف", e.supStatus + (e.supName ? " — " + e.supName + " · " + e.supDate : "")],
       ["حالة المطابقة", e.hoStatus + (e.hoDate ? " · " + e.hoDate : "")], ["آخر مرور", e.lastCheck ? e.lastCheck + " — " + e.lastCheckBy : (e.verified ? "لسه مفيش مرور" : "")], ["آخر تعديل", e.edited]];
     $("#eKv").innerHTML = kv.filter(function(k){ return k[1]; }).map(function(k){ return "<dt>"+esc(k[0])+"</dt><dd>"+esc(k[1]).replace(/(\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2})?)/g, "\u2066$1\u2069")+"</dd>"; }).join("");
-    $("#eChecks").innerHTML = r.checks.map(function(c, i){ return '<li><b>'+esc(c.status)+'</b> — '+esc(c.by)+' ('+esc(c.role)+(c.company ? " — "+esc(c.company) : "")+') · <span class="num">'+esc(c.date)+'</span>'+camLine(c, "patrol", i)+'</li>'; }).join("") || "<li>لسه مفيش مرور</li>";
-    $("#eCam").innerHTML = e.hasCam ? '<h3 style="margin-bottom:4px">لقطة الكاميرا وقت الحصر</h3>' + camLine(e, "add", -1) : "";
+    $("#eChecks").innerHTML = r.checks.map(function(c, i){ return '<li><b>'+esc(c.status)+'</b> — '+esc(c.by)+' ('+esc(c.role)+(c.company ? " — "+esc(c.company) : "")+') · <span class="num">'+esc(c.date)+'</span>'+camLine(c, i)+'</li>'; }).join("") || "<li>لسه مفيش مرور</li>";
+    $("#eCam").innerHTML = e.hasCam ? '<h3 style="margin-bottom:4px">لقطة الكاميرا وقت التسجيل</h3>' + camLine(e, -1) : "";
     $("#eEditsBox").hidden = !r.edits.length;
     $("#eEdits").innerHTML = r.edits.map(function(x){ return '<li><b>'+esc(x.field)+'</b>: «'+esc(x.from)+'» ← «'+esc(x.to)+'» — '+esc(x.by)+' · <span class="num">'+esc(x.at)+'</span></li>'; }).join("");
     if(B.can.edit){
@@ -771,25 +775,20 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       .catch(function(err){ $("#eMsg").textContent = errMsg(err); busy(b, false); });
   });
 
-  // ================================================================ CCTV
-  function camRef(x){ return x.kind === "add" || x.row === undefined ? { id: x.id } : { id: x.id, row: x.row, date: x.date }; }
-  function camLine(x, kind, i){
+  // ================================================================ CCTV (لقطة لكل زيارة وحدة)
+  function camLine(x, i){
     if(!x.hasCam) return "";
-    return '<div class="camline"><div class="camok">📷 لقطة الكاميرا — '+esc(x.camBy)+' · <span class="num">'+esc(x.camAt)+'</span>'+(x.camNote ? ' · '+esc(x.camNote) : '')+
-      ' <button class="sm ghost" type="button" data-cam="'+kind+'" data-i="'+i+'">عرض اللقطة</button></div><div class="campv"></div></div>';
+    return '<div class="camline"><div class="camok">📷 لقطة الكاميرا للزيارة — '+esc(x.camBy)+' · <span class="num">'+esc(x.camAt)+'</span>'+(x.camNote ? ' · '+esc(x.camNote) : '')+
+      ' <button class="sm ghost" type="button" data-cam="'+esc(x.camKey)+'">عرض اللقطة</button></div><div class="campv"></div></div>';
   }
-  function showCam(btn, kind, ref){
+  function showCam(btn){
     var box = btn.closest(".camline").querySelector(".campv");
     if(box.innerHTML){ box.innerHTML = ""; btn.textContent = "عرض اللقطة"; return; }
     box.innerHTML = '<div class="ph-wait">بيحمّل اللقطة…</div>'; btn.textContent = "إخفاء اللقطة";
-    run("cctvPhoto", TOKEN, kind, ref).then(function(src){ box.innerHTML = src ? '<img class="cam" alt="لقطة الكاميرا" src="'+src+'">' : '<div class="empty">مفيش لقطة.</div>'; })
+    run("cctvPhoto", TOKEN, btn.getAttribute("data-cam")).then(function(src){ box.innerHTML = src ? '<img class="cam" alt="لقطة الكاميرا" src="'+src+'">' : '<div class="empty">مفيش لقطة.</div>'; })
       .catch(function(err){ box.innerHTML = '<div class="status err">'+esc(errMsg(err))+'</div>'; });
   }
-  $("#entryDlg").addEventListener("click", function(ev){
-    var b = ev.target.closest("button[data-cam]"); if(!b || !cur) return;
-    var kind = b.getAttribute("data-cam"), i = Number(b.getAttribute("data-i"));
-    showCam(b, kind, kind === "add" ? { id: cur.entry.id } : camRef(cur.checks[i]));
-  });
+  $("#entryDlg").addEventListener("click", function(ev){ var b = ev.target.closest("button[data-cam]"); if(b) showCam(b); });
   var CF = [], camPics = {};
   function loadCctv(){
     var s = $("#cStatus"); s.className = "status"; s.innerHTML = '<span class="spin"></span>';
@@ -797,19 +796,23 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     run("cctvFeed", TOKEN, f).then(function(r){
       CF = r.items; camPics = {};
       $("#cCount").textContent = r.done + " من " + r.total;
-      s.textContent = r.total ? (f.missing ? r.shown + " حركة مستنية لقطة" : r.total + " حركة · " + r.done + " ليها لقطة") + (r.shown > r.items.length ? " (أول " + r.items.length + ")" : "") : "";
-      $("#cList").innerHTML = CF.length ? CF.map(cctvCard).join("") : '<div class="empty">'+(f.missing ? "كل الحركات في الفترة دي ليها لقطات ✓" : "مفيش حركات في الفترة دي.")+'</div>';
+      s.textContent = r.total ? (f.missing ? r.shown + " زيارة مستنية لقطة" : r.total + " زيارة · " + r.done + " ليها لقطة") + (r.shown > r.items.length ? " (أول " + r.items.length + ")" : "") : "";
+      $("#cList").innerHTML = CF.length ? CF.map(cctvCard).join("") : '<div class="empty">'+(f.missing ? "كل الزيارات في الفترة دي ليها لقطات ✓" : "مفيش زيارات في الفترة دي.")+'</div>';
     }).catch(function(err){ s.className = "status err"; s.textContent = errMsg(err); });
   }
   function cctvCard(x, i){
-    var head = x.kind === "add" ? '<span class="pill p-blue">تسجيل حصر</span>' : '<span class="pill '+(x.status === "موجود" ? "p-green" : "p-red")+'">مرور: '+esc(x.status)+'</span>';
+    var did = [];
+    if(x.added.length) did.push('سجّل ' + x.added.length + ' بند: ' + esc(x.added.slice(0, 4).join("، ")) + (x.added.length > 4 ? "…" : ""));
+    if(x.checked) did.push('مرّ على ' + x.checked + ' بند' + (x.missing ? ' · <b style="color:var(--red)">' + x.missing + ' مفقود</b>' : "") + (x.damaged ? ' · <b style="color:var(--amber)">' + x.damaged + ' تالف</b>' : ""));
+    var time = x.first.slice(11) === x.last.slice(11) ? x.first : x.first + " ← " + x.last.slice(11);
     var up = '<div class="up"><label class="photo-in"><div class="pv" data-pv="'+i+'">اللقطة</div><input type="file" accept="image/*" data-pic="'+i+'" aria-label="لقطة الكاميرا"></label>' +
       '<input data-note="'+i+'" placeholder="رقم الكاميرا / ملاحظة (اختياري)" value="'+esc(x.camNote || "")+'"><button class="sm solid" type="button" data-up="'+i+'">'+(x.hasCam ? "تغيير اللقطة" : "رفع اللقطة")+'</button></div>';
-    return '<div class="ccard'+(x.hasCam ? " done" : "")+'" data-i="'+i+'"><div class="t">'+head+' '+esc(x.item)+(x.qty ? ' × <span class="num">'+x.qty+'</span>' : "")+'</div>' +
-      '<div class="m"><span class="num">'+esc(x.unit)+'</span><span>'+bd(x.sector)+'</span><span>'+esc(x.by)+' ('+esc(x.role)+(x.company ? " — "+esc(x.company) : "")+')</span><span class="num">'+esc(x.date)+'</span></div>' +
-      (x.hasCam ? camLine(x, x.kind, i) + '<details><summary class="hint">تغيير اللقطة</summary>'+up+'</details>' : up) + '<div class="status err" data-msg="'+i+'"></div></div>';
+    return '<div class="ccard'+(x.hasCam ? " done" : "")+'" data-i="'+i+'"><div class="t"><span class="pill p-blue">'+esc(x.role)+'</span> '+esc(x.by)+(x.company ? ' <span class="hint">— '+esc(x.company)+'</span>' : "")+'</div>' +
+      '<div class="m"><span>وحدة <b class="num">'+esc(x.unit)+'</b></span><span>'+bd(x.sector)+'</span><span class="num">'+esc(time)+'</span></div>' +
+      '<div class="m">'+did.join(" · ")+'</div>' +
+      (x.hasCam ? camLine(x, i) + '<details><summary class="hint">تغيير اللقطة</summary>'+up+'</details>' : up) + '<div class="status err" data-msg="'+i+'"></div></div>';
   }
-  ["#cGo"].forEach(function(s){ $(s).addEventListener("click", loadCctv); });
+  $("#cGo").addEventListener("click", loadCctv);
   ["#cSector","#cDays","#cMissing"].forEach(function(s){ $(s).addEventListener("change", loadCctv); });
   $("#cUnit").addEventListener("keydown", function(e){ if(e.key === "Enter") loadCctv(); });
   $("#cList").addEventListener("change", function(e){
@@ -819,13 +822,12 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       .catch(function(err){ $('#cList [data-msg="'+i+'"]').textContent = err.message; });
   });
   $("#cList").addEventListener("click", function(e){
-    var v = e.target.closest("button[data-cam]");
-    if(v){ var x = CF[Number(v.getAttribute("data-i"))]; showCam(v, x.kind, camRef(x)); return; }
+    var v = e.target.closest("button[data-cam]"); if(v){ showCam(v); return; }
     var b = e.target.closest("button[data-up]"); if(!b) return;
     var i = b.getAttribute("data-up"), x = CF[Number(i)], msg = $('#cList [data-msg="'+i+'"]');
     if(!camPics[i]){ msg.textContent = "اختار صورة اللقطة الأول."; return; }
     msg.textContent = ""; busy(b, true, "بيرفع…");
-    run("saveCctv", TOKEN, x.kind, camRef(x), camPics[i], $('#cList [data-note="'+i+'"]').value.trim()).then(function(){
+    run("saveCctv", TOKEN, x.camKey, camPics[i], $('#cList [data-note="'+i+'"]').value.trim()).then(function(){
       toast("اترفعت لقطة الكاميرا ✓"); loadCctv();
     }).catch(function(err){ msg.textContent = errMsg(err); busy(b, false, x.hasCam ? "تغيير اللقطة" : "رفع اللقطة"); });
   });
@@ -867,11 +869,14 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   var AD = null, editUser = null, delU = false;
   function loadAdmin(){ run("adminData", TOKEN).then(function(d){ AD = d; drawAdmin(); }).catch(function(err){ toast(errMsg(err)); }); }
   function drawAdmin(){
-    $("#usersBody").innerHTML = AD.users.map(function(u){ return "<tr><td>"+esc(u.name)+"</td><td class=\"num\">"+esc(u.username)+"</td><td>"+esc(ROLE_LABEL[u.role])+"</td><td>"+esc(u.company || "—")+"</td><td>"+(u.role === "admin" || !u.sectors.length ? "كل القطاعات" : u.sectors.map(bd).join("، "))+"</td><td>"+(u.active ? '<span class="pill p-green">شغال</span>' : '<span class="pill p-red">موقوف</span>')+"</td><td class=\"num\">"+esc(u.lastLogin || "—")+'</td><td><button class="sm" type="button" data-u="'+esc(u.username)+'">تعديل</button></td></tr>'; }).join("");
+    $("#usersBody").innerHTML = AD.users.map(function(u){ return "<tr><td>"+esc(u.name)+"</td><td class=\"num\">"+esc(u.username)+"</td><td>"+esc(ROLE_LABEL[u.role])+"</td><td>"+esc(u.company || "—")+"</td><td>"+(u.role === "shift_officer" ? "قطاعات " + esc(u.company || "—") : u.role === "admin" || !u.sectors.length ? "كل القطاعات" : u.sectors.map(bd).join("، "))+"</td><td>"+(u.active ? '<span class="pill p-green">شغال</span>' : '<span class="pill p-red">موقوف</span>')+"</td><td class=\"num\">"+esc(u.lastLogin || "—")+'</td><td><button class="sm" type="button" data-u="'+esc(u.username)+'">تعديل</button></td></tr>'; }).join("");
     $("#sDays").value = AD.overdueDays;
     drawPerms(AD.perms);
     var tag = function(x){ return '<span class="tagitem'+(x.active ? "" : " off")+'"><b>'+esc(x.value)+'</b><button class="sm" type="button" data-kind="'+x.kind+'" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button></span>'; };
-    $("#lsSector").innerHTML = AD.lists.filter(function(x){ return x.kind === "sector"; }).map(tag).join("");
+    $("#lsSector").innerHTML = AD.lists.filter(function(x){ return x.kind === "sector"; }).map(function(x){
+      return '<span class="tagitem'+(x.active ? "" : " off")+'"><b>'+bd(x.value)+'</b><select class="seccomp" data-sec="'+esc(x.value)+'" aria-label="شركة '+esc(x.value)+'"><option value="">من غير شركة</option>' +
+        AD.companies.map(function(c){ return '<option'+(c === x.company ? " selected" : "")+'>'+esc(c)+'</option>'; }).join("") + '</select><button class="sm" type="button" data-kind="sector" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button></span>';
+    }).join("");
     $("#lsItem").innerHTML = AD.lists.filter(function(x){ return x.kind === "item"; }).map(tag).join("");
     $("#lsCompany").innerHTML = AD.lists.filter(function(x){ return x.kind === "company"; }).map(tag).join("");
   }
@@ -886,7 +891,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     run("savePerms", TOKEN, map).then(function(d){ AD = d; drawAdmin(); toast("اتحفظت الصلاحيات."); }).catch(function(err){ toast(errMsg(err)); }).then(function(){ busy(b, false, "حفظ الصلاحيات"); });
   });
   $("#permReset").addEventListener("click", function(){
-    var def = { add:["guard"], review:["supervisor"], patrol:["guard","general_supervisor","company_manager"], dash:["supervisor","general_supervisor","company_manager","emaar"], viewAll:["supervisor","general_supervisor","company_manager","emaar"], events:["emaar"], auditsView:["supervisor","general_supervisor","company_manager","emaar"], audit:["emaar"], export:["emaar"], edit:[], cctv:["cctv"] };
+    var def = { add:["sec_sup"], review:[], patrol:["sec_sup","general_supervisor","shift_officer","emaar"], dash:["general_supervisor","shift_officer","emaar"], viewAll:["general_supervisor","shift_officer","emaar"], events:["general_supervisor","emaar"], auditsView:["general_supervisor","shift_officer","emaar"], audit:["emaar"], export:["emaar"], edit:[], cctv:["cctv"] };
     drawPerms(def); toast("اتعلّم على الافتراضي. دوس «حفظ الصلاحيات» علشان يتطبّق.");
   });
   function drawSecs(sel){
@@ -898,16 +903,20 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   function pickedSecs(){ return $("#uAllSec").checked ? [] : $$("#uSecs input").filter(function(i){ return i.checked; }).map(function(i){ return i.value; }); }
   function afterLists(d){ AD = d; drawAdmin(); run("whoami", TOKEN).then(function(r){ var tok = TOKEN; B = r; B.token = tok; options($("#aSector"), B.sectors, "اختار القطاع"); options($("#aItem"), B.items, "اختار الصنف"); options($("#pSector"), B.sectors, "اختار القطاع"); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); }); }
   $("[data-v=admin]").addEventListener("click", function(e){ var b = e.target.closest("button[data-val]"); if(!b) return; busy(b, true); run("saveListValue", TOKEN, b.getAttribute("data-kind"), b.getAttribute("data-val"), b.getAttribute("data-on") === "1").then(afterLists).catch(function(err){ toast(errMsg(err)); busy(b, false); }); });
+  $("#lsSector").addEventListener("change", function(e){
+    var sel = e.target.closest("select[data-sec]"); if(!sel) return; sel.disabled = true;
+    run("saveSectorCompany", TOKEN, sel.getAttribute("data-sec"), sel.value).then(function(d){ toast("اتحفظت شركة القطاع."); afterLists(d); }).catch(function(err){ toast(errMsg(err)); sel.disabled = false; });
+  });
   $$("[data-v=admin] form[data-kind]").forEach(function(f){ f.addEventListener("submit", function(e){ e.preventDefault(); var inp = f.querySelector("input"), v = inp.value.trim(); if(!v) return; run("saveListValue", TOKEN, f.getAttribute("data-kind"), v, true).then(function(d){ inp.value = ""; toast("اتضاف: " + v); afterLists(d); }).catch(function(err){ toast(errMsg(err)); }); }); });
   $("#settingsForm").addEventListener("submit", function(e){ e.preventDefault(); run("saveOverdueDays", TOKEN, $("#sDays").value).then(function(d){ AD = d; drawAdmin(); B.overdueDays = d.overdueDays; toast("اتحفظ: " + d.overdueDays + " أيام."); loadAlerts(); }).catch(function(err){ toast(errMsg(err)); }); });
   $("#uRole").innerHTML = Object.keys(ROLE_LABEL).map(function(k){ return '<option value="'+k+'">'+esc(ROLE_LABEL[k])+'</option>'; }).join("");
-  function roleRows(){ var r = $("#uRole").value; $("#uCompanyRow").hidden = r !== "company_manager"; $("#uEmailRow").hidden = r !== "admin" && r !== "supervisor"; $("#uSecRow").hidden = r === "admin"; }
+  function roleRows(){ var r = $("#uRole").value; $("#uCompanyRow").hidden = r !== "shift_officer"; $("#uEmailRow").hidden = r !== "admin" && r !== "general_supervisor"; $("#uSecRow").hidden = r === "admin" || r === "shift_officer"; $("#uCompanyHint").hidden = r !== "shift_officer"; }
   $("#uRole").addEventListener("change", roleRows);
   function openUser(u){
     editUser = u || null; delU = false;
     $("#userDlgTitle").textContent = u ? "تعديل: " + u.name : "مستخدم جديد";
     $("#uName").value = u ? u.name : ""; $("#uUser").value = u ? u.username : ""; $("#uUser").readOnly = !!u;
-    $("#uRole").value = u ? u.role : "guard"; options($("#uCompany"), AD.companies, "اختار الشركة", u ? u.company : "");
+    $("#uRole").value = u ? u.role : "sec_sup"; options($("#uCompany"), AD.companies, "اختار الشركة", u ? u.company : "");
     $("#uEmail").value = u ? (u.email || "") : "";
     drawSecs(u ? u.sectors : []);
     $("#uPass").value = ""; $("#uPass").placeholder = u ? "سيبها فاضية لو مش هتغيّرها" : "٦ حروف أو أرقام على الأقل"; $("#uPassLbl").textContent = u ? "كلمة سر جديدة (اختياري)" : "كلمة السر";
@@ -920,8 +929,9 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   $("#userForm").addEventListener("submit", function(e){
     if(e.submitter && e.submitter.value === "cancel") return; e.preventDefault();
     var role = $("#uRole").value;
-    var d = { isNew: !editUser, username: $("#uUser").value.trim().toLowerCase(), name: $("#uName").value.trim(), role: role, company: role === "company_manager" ? $("#uCompany").value : "", email: (role === "admin" || role === "supervisor") ? $("#uEmail").value.trim() : "", password: $("#uPass").value, active: editUser ? $("#uActive").checked : true, sectors: role === "admin" ? [] : pickedSecs() };
-    if(role !== "admin" && !$("#uAllSec").checked && !d.sectors.length){ $("#uMsg").textContent = "علّم على قطاع واحد على الأقل، أو اختار «كل القطاعات»."; return; }
+    var d = { isNew: !editUser, username: $("#uUser").value.trim().toLowerCase(), name: $("#uName").value.trim(), role: role, company: role === "shift_officer" ? $("#uCompany").value : "", email: (role === "admin" || role === "general_supervisor") ? $("#uEmail").value.trim() : "", password: $("#uPass").value, active: editUser ? $("#uActive").checked : true, sectors: role === "admin" || role === "shift_officer" ? [] : pickedSecs() };
+    if(role === "shift_officer" && !d.company){ $("#uMsg").textContent = "اختار شركة ظابط الوردية."; return; }
+    if(role !== "admin" && role !== "shift_officer" && !$("#uAllSec").checked && !d.sectors.length){ $("#uMsg").textContent = "علّم على قطاع واحد على الأقل، أو اختار «كل القطاعات»."; return; }
     var b = $("#uSave"); busy(b, true, "بيحفظ…"); $("#uMsg").textContent = "";
     run("saveUser", TOKEN, d).then(function(res){ AD = res; drawAdmin(); $("#userDlg").close(); toast(editUser ? "اتحفظ التعديل." : "اتعمل المستخدم " + d.username + ". ابعتله اسم المستخدم وكلمة السر."); })
       .catch(function(err){ $("#uMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "حفظ"); });
