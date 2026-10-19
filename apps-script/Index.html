@@ -126,8 +126,6 @@ tr.click:hover td{background:var(--surface-2)}
 .photo-in{position:relative;display:flex;gap:12px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:10px;cursor:pointer}
 .photo-in input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .pv{width:84px;height:84px;border-radius:8px;background:var(--surface-2) center/cover no-repeat;display:grid;place-items:center;color:var(--muted);font-size:11px;flex:none;border:1px solid var(--line)}
-.ref{display:flex;gap:12px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
-.ref img{width:84px;height:84px;object-fit:cover;border-radius:8px}
 .big-photo{width:100%;max-height:340px;object-fit:contain;border-radius:10px;background:var(--surface-2)}
 .ph-wait{height:140px;border-radius:10px;background:var(--surface-2);display:grid;place-items:center;color:var(--muted);font-size:13px}
 dialog{border:1px solid var(--line);border-radius:var(--radius);padding:0;background:var(--surface);color:var(--ink);width:min(620px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
@@ -149,10 +147,6 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 .hbar b{font-family:var(--mono);font-weight:500;font-size:12.5px;min-width:2ch;text-align:left}
 .meter{height:12px;background:var(--surface-2);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
 .meter i{display:block;height:100%;border-radius:99px}
-.catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
-.cat{position:relative;border:1px solid var(--line);border-radius:10px;padding:8px;display:grid;gap:6px;font-size:12.5px;text-align:center;background:var(--surface);cursor:pointer}
-.cat .pv{width:100%;height:90px}
-.cat input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .tagset{display:flex;flex-wrap:wrap;gap:8px}
 .tagitem{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:4px 6px 4px 12px;background:var(--surface-2)}
 .tagitem.off{opacity:.6}
@@ -218,7 +212,6 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     <button role="tab" data-view="events">جولات المرور</button>
     <button role="tab" data-view="audits">زيارات التدقيق</button>
     <button role="tab" data-view="cctv">لقطات الكاميرات</button>
-    <button role="tab" data-view="catalog">كتالوج الأصناف</button>
     <button role="tab" data-view="admin">المستخدمين والإعدادات</button>
   </nav>
 
@@ -231,7 +224,6 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <label class="f">القطاع<select id="aSector"></select></label>
       <label class="f">الصنف<select id="aItem"></select></label>
       <label class="f">الكمية<input id="aQty" type="number" min="1" value="1" inputmode="numeric"></label>
-      <div class="ref wide" id="aRef" hidden><img id="aRefImg" alt="الصورة المرجعية للصنف"><div class="hint">دي الصورة المرجعية للصنف. اتأكد إنك بتسجّل الحاجة الصح.</div></div>
       <label class="f wide">ملاحظات<textarea id="aNotes" placeholder="الحالة، اللون، المكان جوه الوحدة…"></textarea></label>
       <label class="photo-in wide"><div class="pv" id="aPv">مفيش صورة</div><div><b>صورة العنصر (اختياري)</b><div class="hint">صوّره في مكانه.</div></div><input type="file" id="aPhoto" accept="image/*" capture="environment" aria-label="صورة العنصر"></label>
       <div class="actions wide"><button class="primary" id="aSave">تسجيل الحصر</button></div>
@@ -344,12 +336,6 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     <div class="plist" id="cList"></div>
   </section>
 
-  <!-- كتالوج -->
-  <section class="card" data-v="catalog" hidden>
-    <h2>كتالوج صور الأصناف <span class="chip" id="catCount"></span></h2>
-    <p class="hint">ارفع صورة مرجعية لكل صنف، وهتظهر لمشرف الأمن وهو بيختار الصنف علشان يتأكد إنه بيسجّل الحاجة الصح. اضغط على أي صنف علشان ترفع أو تغيّر صورته.</p>
-    <div class="catalog" id="catGrid"></div>
-  </section>
 
   <!-- المستخدمين والإعدادات -->
   <section data-v="admin" style="display:grid;gap:14px" hidden>
@@ -469,7 +455,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(c.events) t.push("events");
     if(c.auditsView || c.audit) t.push("audits");
     if(c.cctv) t.push("cctv");
-    if(b.me.role === "admin") t.push("catalog", "admin");
+    if(b.me.role === "admin") t.push("admin");
     return t;
   }
   var ROLE_ORDER = ["sec_sup","general_supervisor","shift_officer","emaar","cctv"];
@@ -572,7 +558,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     current = v;
     $$("#tabs button").forEach(function(b){ b.setAttribute("aria-selected", String(b.getAttribute("data-view") === v)); });
     $$("[data-v]").forEach(function(s){ s.hidden = s.getAttribute("data-v") !== v; });
-    ({ add: loadAdd, review: loadReview, patrol: loadPatrolMine, mine: loadMine, dash: loadDash, all: function(){ loadAll(true); }, events: loadEvents, audits: loadAudits, cctv: loadCctv, catalog: loadCatalog, admin: loadAdmin }[v] || function(){})();
+    ({ add: loadAdd, review: loadReview, patrol: loadPatrolMine, mine: loadMine, dash: loadDash, all: function(){ loadAll(true); }, events: loadEvents, audits: loadAudits, cctv: loadCctv, admin: loadAdmin }[v] || function(){})();
   }
   $("#tabs").addEventListener("click", function(e){ var b = e.target.closest("button[data-view]"); if(b) showView(b.getAttribute("data-view")); });
 
@@ -605,15 +591,8 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
 
   // ================================================================ add entry (مشرف الأمن)
-  var aPhoto = null, refCache = {};
+  var aPhoto = null;
   function loadAdd(){}
-  $("#aItem").addEventListener("change", function(){
-    var it = $("#aItem").value, box = $("#aRef"); box.hidden = true;
-    if(!it || B.catalogPhotos.indexOf(it) < 0) return;
-    var show = function(src){ if(src && $("#aItem").value === it){ $("#aRefImg").src = src; box.hidden = false; } };
-    if(refCache[it]) return show(refCache[it]);
-    run("catalogPhoto", TOKEN, it).then(function(src){ refCache[it] = src; show(src); }).catch(function(){});
-  });
   $("#aPhoto").addEventListener("change", function(e){
     var f = e.target.files && e.target.files[0]; e.target.value = ""; if(!f) return;
     shrink(f, 1200, 0.7).then(function(d){ aPhoto = d; var pv = $("#aPv"); pv.textContent = ""; pv.style.backgroundImage = "url('"+d+"')"; }).catch(function(err){ $("#aMsg").textContent = err.message; });
@@ -627,7 +606,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var b = $("#aSave"); busy(b, true, "بيسجّل…"); $("#aMsg").textContent = "";
     run("addEntry", TOKEN, d, aPhoto).then(function(r){
       toast("اتسجل الحصر (" + r.id + ") ودخل المرور الدوري.");
-      $("#aItem").value = ""; $("#aQty").value = 1; $("#aNotes").value = ""; $("#aRef").hidden = true; aPhoto = null; var pv = $("#aPv"); pv.style.backgroundImage = ""; pv.textContent = "مفيش صورة";
+      $("#aItem").value = ""; $("#aQty").value = 1; $("#aNotes").value = ""; aPhoto = null; var pv = $("#aPv"); pv.style.backgroundImage = ""; pv.textContent = "مفيش صورة";
     }).catch(function(err){ $("#aMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "تسجيل الحصر"); });
   });
 
@@ -850,20 +829,6 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     run("addAudit", TOKEN, d).then(function(list){ drawAudits(list); toast("اتسجلت الزيارة."); $("#auUnit").value = ""; $("#auNotes").value = ""; }).catch(function(err){ $("#auMsg").textContent = errMsg(err); }).then(function(){ busy(b, false); });
   });
   $("#csvAudits").addEventListener("click", function(){ run("exportAudits", TOKEN).then(function(rows){ csvDownload(rows, "تقرير_تدقيق_إعمار"); }).catch(function(err){ toast(errMsg(err)); }); });
-
-  // ================================================================ catalog (admin)
-  function drawCatalog(map){
-    var names = Object.keys(map), n = names.filter(function(k){ return map[k]; }).length;
-    $("#catCount").textContent = n + " من " + names.length + " عليهم صورة";
-    $("#catGrid").innerHTML = names.map(function(k){ return '<label class="cat"><div class="pv" style="'+(map[k] ? "background-image:url('"+map[k]+"')" : "")+'">'+(map[k] ? "" : "لا توجد صورة")+'</div><span>'+esc(k)+'</span><input type="file" accept="image/*" data-item="'+esc(k)+'" aria-label="صورة '+esc(k)+'"></label>'; }).join("");
-  }
-  function loadCatalog(){ $("#catGrid").innerHTML = '<div class="empty">بيحمّل…</div>'; run("catalogThumbs", TOKEN).then(drawCatalog).catch(function(err){ toast(errMsg(err)); }); }
-  $("#catGrid").addEventListener("change", function(e){
-    var inp = e.target; if(!inp.getAttribute("data-item")) return; var f = inp.files && inp.files[0]; if(!f) return;
-    var item = inp.getAttribute("data-item"); toast("بيرفع صورة " + item + "…");
-    Promise.all([shrink(f, 1000, 0.72), shrink(f, 240, 0.7)]).then(function(r){ return run("saveCatalogPhoto", TOKEN, item, r[0], r[1]); })
-      .then(function(map){ drawCatalog(map); refCache = {}; if(B.catalogPhotos.indexOf(item) < 0) B.catalogPhotos.push(item); toast("اتحفظت صورة " + item + "."); }).catch(function(err){ toast(errMsg(err)); });
-  });
 
   // ================================================================ admin: users / settings / lists
   var AD = null, editUser = null, delU = false;

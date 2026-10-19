@@ -99,7 +99,6 @@ function setup() {
   const ss = ss_();
   entriesSheet_(); patrolsSheet_(); auditsSheet_(); editsSheet_(); usersSheet_(); listsSheet_(); settingsSheet_();
   folder_('PHOTOS_FOLDER', 'متروكات - صور القيود');
-  folder_('CATALOG_FOLDER', 'متروكات - صور الأصناف');
   folder_('CCTV_FOLDER', CCTV_FOLDER_NAME); visitsSheet_();
   const keep = [ENTRIES_SHEET, PATROLS_SHEET, AUDITS_SHEET, EDITS_SHEET, USERS_SHEET, LISTS_SHEET, SETTINGS_SHEET];
   ss.getSheets().forEach(function (s) {
@@ -333,7 +332,6 @@ function boot_(u) {
   const can = {};
   Object.keys(PERMS).forEach(function (k) { can[k] = can_(u, k); });
   return { me: publicUser_(u), can: can, sectors: l.sectors.filter(function (s) { return inScope_(u, s); }), items: l.items, companies: l.companies,
-    catalogPhotos: l.all.filter(function (x) { return x.kind === 'item' && x.hasPhoto; }).map(function (x) { return x.value; }),
     overdueDays: overdueDays_(), sup: SUP, ho: HO, ratings: RATINGS };
 }
 
@@ -379,7 +377,7 @@ function changeMyPassword(token, oldPw, newPw) {
   return makeToken_(findUser_(u.username));
 }
 
-// ---------------------------------------------------------------- admin: users, lists, settings, catalog
+// ---------------------------------------------------------------- admin: users, lists, settings
 
 function adminData(token) {
   auth_(token, ['admin']);
@@ -489,38 +487,6 @@ function saveOverdueDays(token, days) {
   return adminData(token);
 }
 
-/** صور كتالوج الأصناف: المكتب الرئيسي بيرفعها، وكل الأدوار بتشوفها. */
-function catalogThumbs(token) {
-  auth_(token, ['admin']);
-  const sh = listsSheet_(), out = {};
-  lists_().all.filter(function (x) { return x.kind === 'item'; }).forEach(function (x) {
-    out[x.value] = x.hasPhoto ? String(sh.getRange(x.row, 5).getValue() || '') : '';
-  });
-  return out;
-}
-function catalogPhoto(token, item) {
-  auth_(token);
-  const x = lists_().all.filter(function (y) { return y.kind === 'item' && y.value === item; })[0];
-  if (!x || !x.hasPhoto) return '';
-  return String(listsSheet_().getRange(x.row, 5).getValue() || '');
-}
-function saveCatalogPhoto(token, item, photo, thumb) {
-  auth_(token, ['admin']);
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try {
-    const x = lists_().all.filter(function (y) { return y.kind === 'item' && y.value === item; })[0];
-    if (!x) throw new Error('الصنف ده مش موجود.');
-    const sh = listsSheet_();
-    const old = String(sh.getRange(x.row, 4).getValue() || '');
-    const id = savePhoto_(photo, 'CATALOG_FOLDER', 'متروكات - صور الأصناف', 'item_' + x.row);
-    if (!id) throw new Error('الصورة مش مظبوطة.');
-    sh.getRange(x.row, 4).setValue(id);
-    sh.getRange(x.row, 5).setValue(/^data:image\/jpeg;base64,/.test(thumb || '') && thumb.length < 45000 ? thumb : '');
-    if (old) { try { DriveApp.getFileById(old).setTrashed(true); } catch (e) {} }
-    dropCache_('lists');
-  } finally { lock.releaseLock(); }
-  return catalogThumbs(token);
-}
 
 // ================================================================ entries
 
