@@ -216,6 +216,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     <button role="tab" data-view="patrol">المرور الدوري</button>
     <button role="tab" data-view="mine">قيودي</button>
     <button role="tab" data-view="dash">لوحة المتابعة</button>
+    <button role="tab" data-view="units">الوحدات</button>
     <button role="tab" data-view="all">كل القيود</button>
     <button role="tab" data-view="events">جولات المرور</button>
     <button role="tab" data-view="audits">زيارات التدقيق</button>
@@ -285,6 +286,19 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   </section>
 
   <!-- كل القيود -->
+  <section class="card" data-v="units" hidden>
+    <h2>بيانات الوحدات</h2>
+    <p class="hint">كل وحدة وبنودها المتروكة. دوس على الوحدة تشوف بنودها، ودوس على البند تشوف تفاصيله والمرور عليه.</p>
+    <div class="bar-row">
+      <label class="f grow">بحث برقم الوحدة أو الصنف<input id="uQ" type="search" dir="auto"></label>
+      <label class="f">القطاع<select id="uSector"></select></label>
+      <label class="f">عرض<select id="uStatus"><option value="">كل الوحدات</option><option value="flagged">فيها بلاغ مفقود / تالف</option><option value="overdue">متأخر عليها مرور</option><option value="pending">فيها بنود قيد المراجعة</option></select></label>
+    </div>
+    <div class="kpis" id="uKpis"></div>
+    <span class="status" id="uCount"></span>
+    <div class="plist" id="uList"></div>
+  </section>
+
   <section class="card" data-v="all" hidden>
     <h2>كل القيود</h2>
     <div class="bar-row">
@@ -350,7 +364,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   <section data-v="admin" style="display:grid;gap:14px" hidden>
     <div class="card">
       <h2>المستخدمين <button class="sm solid" id="addUserBtn" type="button" style="margin-inline-start:auto">+ مستخدم جديد</button></h2>
-      <div class="tablewrap"><table><thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>الشركة</th><th>القطاعات</th><th>الحالة</th><th>آخر دخول</th><th></th></tr></thead><tbody id="usersBody"></tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>القطاعات</th><th>الحالة</th><th>آخر دخول</th><th></th></tr></thead><tbody id="usersBody"></tbody></table></div>
     </div>
     <div class="card">
       <h2>الصلاحيات — كل دور يقدر يعمل إيه</h2>
@@ -367,12 +381,11 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     </form>
     <div class="card">
       <h2>القوايم</h2>
-      <h3>القطاعات</h3><p class="hint">اختار الشركة المسؤولة عن كل قطاع، علشان ظابط الوردية يشوف قطاعات شركته بس.</p><div class="tagset" id="lsSector"></div>
+      <h3>القطاعات</h3><div class="tagset" id="lsSector"></div>
       <form class="bar-row" data-kind="sector"><label class="f grow">قطاع جديد<input></label><button class="solid" type="submit">إضافة</button></form>
       <h3>الأصناف</h3><div class="tagset" id="lsItem"></div>
       <form class="bar-row" data-kind="item"><label class="f grow">صنف جديد<input></label><button class="solid" type="submit">إضافة</button></form>
-      <h3>شركات الأمن</h3><div class="tagset" id="lsCompany"></div>
-      <form class="bar-row" data-kind="company"><label class="f grow">شركة جديدة<input></label><button class="solid" type="submit">إضافة</button></form>
+      <div class="tagset" id="lsCompany" hidden></div>
       <p class="hint">الموقوف بيختفي من القوايم، بس بيفضل في القيود القديمة.</p>
     </div>
   </section>
@@ -450,7 +463,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   var $ = function(s){ return document.querySelector(s); };
   var $$ = function(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var store = { get: function(k){ try{ return localStorage.getItem(k) || ""; }catch(e){ return ""; } }, set: function(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
-  var ROLE_LABEL = { sec_sup:"مشرف الأمن", general_supervisor:"المشرف العام", shift_officer:"ظابط الوردية", emaar:"مشرف أمن إعمار", cctv:"مراقب CCTV", admin:"المكتب الرئيسي" };
+  var ROLE_LABEL = { sec_sup:"مشرف الأمن", general_supervisor:"المشرف العام", emaar:"مشرف أمن إعمار", cctv:"مراقب CCTV", admin:"المكتب الرئيسي" };
   // التابات بتظهر على حسب الصلاحيات اللي المكتب الرئيسي محددها
   function tabsFor(b){
     var c = b.can, t = [];
@@ -460,6 +473,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(c.patrol) t.push("patrol");
     if(c.dash && b.me.role !== "admin") t.push("dash");
     if(c.add) t.push("mine");
+    if(c.units) t.push("units");
     if(c.viewAll) t.push("all");
     if(c.events) t.push("events");
     if(c.auditsView || c.audit) t.push("audits");
@@ -467,7 +481,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(b.me.role === "admin") t.push("admin");
     return t;
   }
-  var ROLE_ORDER = ["sec_sup","general_supervisor","shift_officer","emaar","cctv"];
+  var ROLE_ORDER = ["sec_sup","general_supervisor","emaar","cctv"];
   var TOKEN = store.get("mt.token"), B = null;
 
   // ---------- server (retries when Google is busy) ----------
@@ -590,13 +604,13 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     current = v;
     $$("#tabs button").forEach(function(b){ b.setAttribute("aria-selected", String(b.getAttribute("data-view") === v)); });
     $$("[data-v]").forEach(function(s){ s.hidden = s.getAttribute("data-v") !== v; });
-    ({ add: loadAdd, review: loadReview, patrol: loadPatrolMine, mine: loadMine, dash: loadDash, all: function(){ loadAll(true); }, events: loadEvents, audits: loadAudits, cctv: loadCctv, admin: loadAdmin }[v] || function(){})();
+    ({ add: loadAdd, review: loadReview, patrol: loadPatrolMine, mine: loadMine, dash: loadDash, all: function(){ loadAll(true); }, units: loadUnits, events: loadEvents, audits: loadAudits, cctv: loadCctv, admin: loadAdmin }[v] || function(){})();
   }
   $("#tabs").addEventListener("click", function(e){ var b = e.target.closest("button[data-view]"); if(b) showView(b.getAttribute("data-view")); });
 
   function start(){
     $("#lockScreen").hidden = true; $("#app").hidden = false;
-    $("#meName").textContent = B.me.name + (B.me.company ? " — " + B.me.company : ""); $("#meRole").textContent = ROLE_LABEL[B.me.role];
+    $("#meName").textContent = B.me.name; $("#meRole").textContent = ROLE_LABEL[B.me.role];
     var tabs = tabsFor(B);
     $$("#tabs button").forEach(function(b){ b.hidden = tabs.indexOf(b.getAttribute("data-view")) < 0; });
     $("#tabs").hidden = tabs.length < 2;
@@ -769,6 +783,49 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     }).catch(function(err){ toast(errMsg(err)); });
   }
 
+  // ================================================================ units
+  var unitsData = [], unitsR = null, uT = null, openUnits = {};
+  function loadUnits(){
+    if(!$("#uSector").options.length) options($("#uSector"), B.sectors, "كل القطاعات");
+    $("#uCount").innerHTML = '<span class="spin"></span>';
+    run("unitsList", TOKEN, { q: $("#uQ").value.trim(), sector: $("#uSector").value, status: $("#uStatus").value }).then(function(r){
+      unitsData = r.units; unitsR = r; drawUnits(r);
+    }).catch(function(err){ $("#uCount").textContent = errMsg(err); });
+  }
+  function drawUnits(r){
+    var items = 0, qty = 0, flags = 0, late = 0;
+    unitsData.forEach(function(g){ g.items.forEach(function(x){ items++; qty += Number(x.qty) || 0; if(x.flag) flags++; if(x.overdue) late++; }); });
+    var k = function(label, v, cls){ return '<div class="kpi '+(cls||"")+'"><span>'+esc(label)+'</span><b class="num">'+v+'</b></div>'; };
+    $("#uKpis").innerHTML = k("وحدات", fmt(r.total)) + k("بنود", fmt(items)) + k("قطع", fmt(qty)) + k("بلاغات مفقود / تالف", fmt(flags), flags ? "bad" : "") + k("متأخر عليها مرور", fmt(late), late ? "warn" : "");
+    $("#uCount").textContent = r.total > unitsData.length ? "بيعرض أول " + fmt(unitsData.length) + " وحدة من " + fmt(r.total) + " — ضيّق البحث" : "";
+    $("#uList").innerHTML = unitsData.length ? unitsData.map(function(g, i){
+      var key = g.sector + "|" + g.unit, open = !!openUnits[key];
+      var gf = g.items.filter(function(x){ return x.flag; }).length, gl = g.items.filter(function(x){ return x.overdue; }).length;
+      var gp = g.items.filter(function(x){ return x.supStatus === "قيد المراجعة"; }).length;
+      var last = g.items.map(function(x){ return x.lastCheck; }).filter(String).sort().pop();
+      return '<div class="ucard'+(gf ? " flag" : gl ? " late" : "")+'"><div class="uh click" data-unit="'+i+'"><div><div class="u">'+(open ? "▾" : "▸")+' 🏠 <span class="num">'+esc(g.unit)+'</span></div>' +
+        '<div class="m"><span>'+bd(g.sector)+'</span><span>'+unitSummary(g)+'</span>'+(gl ? '<span class="pill p-amber">'+gl+' متأخر ⏱</span>' : "")+(gp ? '<span class="pill p-amber">'+gp+' قيد المراجعة</span>' : "")+
+        '<span>'+(last ? 'آخر مرور: <span class="num">'+esc(last)+'</span>' : "لسه مفيش مرور")+'</span></div></div></div>' +
+        (open ? groupedItems(g) : "") + '</div>';
+    }).join("") : '<div class="empty">مفيش وحدات بالبحث ده.</div>';
+  }
+  function groupedItems(g){
+    return '<div class="tablewrap"><table><thead><tr><th>رقم القيد</th><th>الصنف</th><th>الكمية</th><th>آخر مرور</th><th>سجّله</th><th>الحالة</th></tr></thead><tbody>' +
+      g.items.map(function(x){
+        return '<tr class="click" data-id="'+esc(x.id)+'"><td class="num">'+esc(x.id)+'</td><td>'+esc(x.item)+(x.hasPhoto ? " 📷" : "")+(x.notes ? '<div class="hint">'+esc(x.notes)+'</div>' : "")+'</td><td class="num">'+x.qty+'</td>' +
+          '<td>'+(x.lastCheck ? '<span class="num">'+esc(x.lastCheck)+'</span> — '+esc(x.lastCheckBy) : "—")+(x.overdue ? ' <span class="pill p-amber">متأخر</span>' : "")+'</td><td>'+esc(x.guardName)+' · <span class="num">'+esc(String(x.guardDate).slice(0, 10))+'</span></td>' +
+          '<td>'+(x.flag ? flagPill(x.flag) : supPill(x.supStatus))+'</td></tr>';
+      }).join("") + '</tbody></table></div>';
+  }
+  $("#uList").addEventListener("click", function(e){
+    var h = e.target.closest("[data-unit]"); if(!h) return;
+    var g = unitsData[+h.getAttribute("data-unit")], key = g.sector + "|" + g.unit;
+    openUnits[key] = !openUnits[key]; drawUnits(unitsR);
+  });
+  $("#uSector").addEventListener("change", loadUnits);
+  $("#uStatus").addEventListener("change", loadUnits);
+  $("#uQ").addEventListener("input", function(){ clearTimeout(uT); uT = setTimeout(loadUnits, 400); });
+
   // ================================================================ all entries
   var allOffset = 0, allList = [], qT;
   function allFilters(){ return { q: $("#fQ").value.trim(), sector: $("#fSector").value, status: $("#fStatus").value }; }
@@ -915,13 +972,12 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   var AD = null, editUser = null, delU = false;
   function loadAdmin(){ run("adminData", TOKEN).then(function(d){ AD = d; drawAdmin(); }).catch(function(err){ toast(errMsg(err)); }); }
   function drawAdmin(){
-    $("#usersBody").innerHTML = AD.users.map(function(u){ return "<tr><td>"+esc(u.name)+"</td><td class=\"num\">"+esc(u.username)+"</td><td>"+esc(ROLE_LABEL[u.role])+"</td><td>"+esc(u.company || "—")+"</td><td>"+(u.role === "shift_officer" ? "قطاعات " + esc(u.company || "—") : u.role === "admin" || !u.sectors.length ? "كل القطاعات" : u.sectors.map(bd).join("، "))+"</td><td>"+(u.active ? '<span class="pill p-green">شغال</span>' : '<span class="pill p-red">موقوف</span>')+"</td><td class=\"num\">"+esc(u.lastLogin || "—")+'</td><td><button class="sm" type="button" data-u="'+esc(u.username)+'">تعديل</button></td></tr>'; }).join("");
+    $("#usersBody").innerHTML = AD.users.map(function(u){ return "<tr><td>"+esc(u.name)+"</td><td class=\"num\">"+esc(u.username)+"</td><td>"+esc(ROLE_LABEL[u.role])+"</td><td>"+(u.role === "admin" || !u.sectors.length ? "كل القطاعات" : u.sectors.map(bd).join("، "))+"</td><td>"+(u.active ? '<span class="pill p-green">شغال</span>' : '<span class="pill p-red">موقوف</span>')+"</td><td class=\"num\">"+esc(u.lastLogin || "—")+'</td><td><button class="sm" type="button" data-u="'+esc(u.username)+'">تعديل</button></td></tr>'; }).join("");
     $("#sDays").value = AD.overdueDays;
     drawPerms(AD.perms);
     var tag = function(x){ return '<span class="tagitem'+(x.active ? "" : " off")+'"><b>'+esc(x.value)+'</b><button class="sm" type="button" data-kind="'+x.kind+'" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button></span>'; };
     $("#lsSector").innerHTML = AD.lists.filter(function(x){ return x.kind === "sector"; }).map(function(x){
-      return '<span class="tagitem'+(x.active ? "" : " off")+'"><b>'+bd(x.value)+'</b><select class="seccomp" data-sec="'+esc(x.value)+'" aria-label="شركة '+esc(x.value)+'"><option value="">من غير شركة</option>' +
-        AD.companies.map(function(c){ return '<option'+(c === x.company ? " selected" : "")+'>'+esc(c)+'</option>'; }).join("") + '</select><button class="sm" type="button" data-kind="sector" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button></span>';
+      return '<span class="tagitem'+(x.active ? "" : " off")+'"><b>'+bd(x.value)+'</b><button class="sm" type="button" data-kind="sector" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button></span>';
     }).join("");
     $("#lsItem").innerHTML = AD.lists.filter(function(x){ return x.kind === "item"; }).map(tag).join("");
     $("#lsCompany").innerHTML = AD.lists.filter(function(x){ return x.kind === "company"; }).map(tag).join("");
@@ -937,7 +993,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     run("savePerms", TOKEN, map).then(function(d){ AD = d; drawAdmin(); toast("اتحفظت الصلاحيات."); }).catch(function(err){ toast(errMsg(err)); }).then(function(){ busy(b, false, "حفظ الصلاحيات"); });
   });
   $("#permReset").addEventListener("click", function(){
-    var def = { add:["sec_sup"], review:[], patrol:["sec_sup","general_supervisor","shift_officer","emaar"], dash:["general_supervisor","shift_officer","emaar"], viewAll:["general_supervisor","shift_officer","emaar"], events:["general_supervisor","emaar"], auditsView:["general_supervisor","shift_officer","emaar"], audit:["emaar"], export:["emaar"], edit:[], cctv:["cctv"] };
+    var def = { add:["sec_sup"], review:[], patrol:["sec_sup","general_supervisor","emaar"], dash:["general_supervisor","emaar"], viewAll:["general_supervisor","emaar"], events:["general_supervisor","emaar"], auditsView:["general_supervisor","emaar"], audit:["emaar"], export:["emaar"], edit:[], cctv:["cctv"], units:["general_supervisor","emaar"] };
     drawPerms(def); toast("اتعلّم على الافتراضي. دوس «حفظ الصلاحيات» علشان يتطبّق.");
   });
   function drawSecs(sel){
@@ -956,7 +1012,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   $$("[data-v=admin] form[data-kind]").forEach(function(f){ f.addEventListener("submit", function(e){ e.preventDefault(); var inp = f.querySelector("input"), v = inp.value.trim(); if(!v) return; run("saveListValue", TOKEN, f.getAttribute("data-kind"), v, true).then(function(d){ inp.value = ""; toast("اتضاف: " + v); afterLists(d); }).catch(function(err){ toast(errMsg(err)); }); }); });
   $("#settingsForm").addEventListener("submit", function(e){ e.preventDefault(); run("saveOverdueDays", TOKEN, $("#sDays").value).then(function(d){ AD = d; drawAdmin(); B.overdueDays = d.overdueDays; toast("اتحفظ: " + d.overdueDays + " أيام."); loadAlerts(); }).catch(function(err){ toast(errMsg(err)); }); });
   $("#uRole").innerHTML = Object.keys(ROLE_LABEL).map(function(k){ return '<option value="'+k+'">'+esc(ROLE_LABEL[k])+'</option>'; }).join("");
-  function roleRows(){ var r = $("#uRole").value; $("#uCompanyRow").hidden = r !== "shift_officer"; $("#uEmailRow").hidden = r !== "admin" && r !== "general_supervisor"; $("#uSecRow").hidden = r === "admin" || r === "shift_officer"; $("#uCompanyHint").hidden = r !== "shift_officer"; }
+  function roleRows(){ var r = $("#uRole").value; $("#uCompanyRow").hidden = true; $("#uEmailRow").hidden = r !== "admin" && r !== "general_supervisor"; $("#uSecRow").hidden = r === "admin"; $("#uCompanyHint").hidden = true; }
   $("#uRole").addEventListener("change", roleRows);
   function openUser(u){
     editUser = u || null; delU = false;
@@ -975,9 +1031,8 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   $("#userForm").addEventListener("submit", function(e){
     if(e.submitter && e.submitter.value === "cancel") return; e.preventDefault();
     var role = $("#uRole").value;
-    var d = { isNew: !editUser, username: $("#uUser").value.trim().toLowerCase(), name: $("#uName").value.trim(), role: role, company: role === "shift_officer" ? $("#uCompany").value : "", email: (role === "admin" || role === "general_supervisor") ? $("#uEmail").value.trim() : "", password: $("#uPass").value, active: editUser ? $("#uActive").checked : true, sectors: role === "admin" || role === "shift_officer" ? [] : pickedSecs() };
-    if(role === "shift_officer" && !d.company){ $("#uMsg").textContent = "اختار شركة ظابط الوردية."; return; }
-    if(role !== "admin" && role !== "shift_officer" && !$("#uAllSec").checked && !d.sectors.length){ $("#uMsg").textContent = "علّم على قطاع واحد على الأقل، أو اختار «كل القطاعات»."; return; }
+    var d = { isNew: !editUser, username: $("#uUser").value.trim().toLowerCase(), name: $("#uName").value.trim(), role: role, company: "", email: (role === "admin" || role === "general_supervisor") ? $("#uEmail").value.trim() : "", password: $("#uPass").value, active: editUser ? $("#uActive").checked : true, sectors: role === "admin" ? [] : pickedSecs() };
+    if(role !== "admin" && !$("#uAllSec").checked && !d.sectors.length){ $("#uMsg").textContent = "علّم على قطاع واحد على الأقل، أو اختار «كل القطاعات»."; return; }
     var b = $("#uSave"); busy(b, true, "بيحفظ…"); $("#uMsg").textContent = "";
     run("saveUser", TOKEN, d).then(function(res){ AD = res; drawAdmin(); $("#userDlg").close(); toast(editUser ? "اتحفظ التعديل." : "اتعمل المستخدم " + d.username + ". ابعتله اسم المستخدم وكلمة السر."); })
       .catch(function(err){ $("#uMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "حفظ"); });

@@ -31,14 +31,16 @@ const LIST_HEADERS = ['القائمة', 'القيمة', 'نشط', 'صورة (Dri
 const V_HEADERS = ['المفتاح', 'اليوم', 'الوحدة', 'القطاع', 'الشخص', 'حساب الشخص', 'الدور', 'لقطة الكاميرا (Drive ID)', 'رفعها', 'تاريخ الرفع', 'ملاحظات'];
 
 const ROLES = {
-  sec_sup: 'مشرف الأمن', general_supervisor: 'المشرف العام', shift_officer: 'ظابط الوردية',
+  sec_sup: 'مشرف الأمن', general_supervisor: 'المشرف العام',
   emaar: 'مشرف أمن إعمار', cctv: 'مراقب CCTV', admin: 'المكتب الرئيسي'
 };
 // الأدوار القديمة بتتحوّل تلقائيًا للجديدة.
-const OLD_ROLES = { guard: 'sec_sup', supervisor: 'sec_sup', company_manager: 'shift_officer',
-  'فرد الأمن': 'sec_sup', 'المشرف': 'sec_sup', 'مدير شركة الأمن': 'shift_officer' };
+// ظابط الوردية اتلغى: حساباته بتتحوّل لـ «المشرف العام» على قطاعات شركته (شوف users_).
+const OLD_ROLES = { guard: 'sec_sup', supervisor: 'sec_sup', company_manager: 'general_supervisor', shift_officer: 'general_supervisor',
+  'فرد الأمن': 'sec_sup', 'المشرف': 'sec_sup', 'مدير شركة الأمن': 'general_supervisor', 'ظابط الوردية': 'general_supervisor' };
+const SHIFT_LABELS = ['shift_officer', 'ظابط الوردية', 'company_manager', 'مدير شركة الأمن'];
 // الأدوار اللي بتدخل الوحدات (ومراقب الكاميرات بيرفعلها لقطات).
-const VISITORS = ['sec_sup', 'general_supervisor', 'shift_officer', 'emaar', 'admin'];
+const VISITORS = ['sec_sup', 'general_supervisor', 'emaar', 'admin'];
 const SUP = { pending: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض' };
 const HO = { waiting: 'بانتظار المطابقة', done: 'تمت المطابقة', none: '—' };
 const FIELD = ['موجود', 'مفقود', 'تالف'];
@@ -56,20 +58,22 @@ const PERMS = {
   audit: 'تسجيل زيارة تدقيق',
   export: 'تحميل Excel',
   edit: 'تعديل ومسح القيود',
-  cctv: 'رفع لقطات الكاميرات (CCTV)'
+  cctv: 'رفع لقطات الكاميرات (CCTV)',
+  units: 'بيانات الوحدات'
 };
 const DEFAULT_CAN = {
   add: ['sec_sup'],
   review: [],
-  patrol: ['sec_sup', 'general_supervisor', 'shift_officer', 'emaar'],
-  dash: ['general_supervisor', 'shift_officer', 'emaar'],
-  viewAll: ['general_supervisor', 'shift_officer', 'emaar'],
+  patrol: ['sec_sup', 'general_supervisor', 'emaar'],
+  dash: ['general_supervisor', 'emaar'],
+  viewAll: ['general_supervisor', 'emaar'],
   events: ['general_supervisor', 'emaar'],
-  auditsView: ['general_supervisor', 'shift_officer', 'emaar'],
+  auditsView: ['general_supervisor', 'emaar'],
   audit: ['emaar'],
   export: ['emaar'],
   edit: [],
-  cctv: ['cctv']
+  cctv: ['cctv'],
+  units: ['general_supervisor', 'emaar']
 };
 const PERMS_KEY = 'الصلاحيات (الأدوار الجديدة)';
 
@@ -196,8 +200,17 @@ function users_() {
   if (hit) return JSON.parse(hit);
   const out = [];
   const sh = usersSheet_(), fix = [];
+  let secComp = null;
   values_(sh, U_HEADERS.length).forEach(function (r, i) {
     if (!r[0]) return;
+    if (SHIFT_LABELS.indexOf(String(r[2]).trim()) >= 0) {
+      // ظابط وردية قديم: يبقى مشرف عام على قطاعات شركته، ولو شركته مالهاش قطاعات يتوقف
+      secComp = secComp || lists_().sectorCompany;
+      const comp = String(r[3] || '').trim();
+      const secs = Object.keys(secComp).filter(function (k) { return comp && secComp[k] === comp; });
+      r[11] = secs.join(' ، '); if (!secs.length) r[4] = 'لا';
+      try { sh.getRange(i + 2, 12).setValue(r[11]); sh.getRange(i + 2, 5).setValue(r[4]); } catch (e) {}
+    }
     if (String(r[2]).trim() !== ROLES[roleKey_(r[2])]) fix.push([i + 2, ROLES[roleKey_(r[2])]]);
     out.push({ row: i + 2, username: String(r[0]).trim().toLowerCase(), name: String(r[1]), role: roleKey_(r[2]), company: String(r[3] || ''),
       active: String(r[4]).trim() !== 'لا', lastLogin: String(r[5] || ''), created: String(r[6] || ''), email: String(r[7] || '').trim(),
@@ -282,10 +295,6 @@ function can_(u, k) { return u.role === 'admin' || (perms_()[k] || []).indexOf(u
 /** القطاعات المسموحة للمستخدم، أو null = كل القطاعات. */
 function scope_(u) {
   if (u.role === 'admin') return null;
-  if (u.role === 'shift_officer') {   // ظابط الوردية: قطاعات شركته بس
-    const sc = lists_().sectorCompany;
-    return Object.keys(sc).filter(function (k) { return u.company && sc[k] === u.company; });
-  }
   return !u.sectors || !u.sectors.length ? null : u.sectors;
 }
 function inScope_(u, sector) { const s = scope_(u); return !s || s.indexOf(String(sector)) >= 0; }
@@ -423,8 +432,7 @@ function writeUser_(d, isNew) {
   const name = clean_(d.name) || username;
   const role = roleKey_(d.role);
   const active = d.active !== false;
-  const company = role === 'shift_officer' ? clean_(d.company) : '';
-  if (role === 'shift_officer' && !company) throw new Error('اختار الشركة لظابط الوردية.');
+  const company = '';
   const email = String(d.email || '').trim().toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('الإيميل مش مظبوط.');
   const existing = findUser_(username);
@@ -434,7 +442,7 @@ function writeUser_(d, isNew) {
   if ((isNew || pw) && pw.length < 6) throw new Error('كلمة السر لازم تبقى ٦ حروف أو أرقام على الأقل.');
   const known = lists_().all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; });
   let sectors = d.sectors === undefined && existing ? existing.sectors : (Array.isArray(d.sectors) ? d.sectors : []);
-  sectors = role === 'admin' || role === 'shift_officer' ? [] : sectors.map(function (x) { return String(x).trim(); }).filter(function (x, i, a) { return known.indexOf(x) >= 0 && a.indexOf(x) === i; });
+  sectors = role === 'admin' ? [] : sectors.map(function (x) { return String(x).trim(); }).filter(function (x, i, a) { return known.indexOf(x) >= 0 && a.indexOf(x) === i; });
   let salt = existing ? existing.salt : '', hash = existing ? existing.hash : '', ver = existing ? existing.ver : 1;
   if (pw) { salt = Utilities.getUuid(); hash = hash_(salt, pw); if (existing) ver++; }
   if (existing && existing.active && !active) ver++;
@@ -720,6 +728,32 @@ function searchEntries(token, f, offset) {
   const rows = scopedEntries_(u).filter(function (e) { return matches_(e, f); });
   offset = Number(offset) || 0;
   return { total: rows.length, items: rows.slice(offset, offset + 50).map(clientEntry_) };
+}
+
+/** بيانات الوحدات: كل وحدة وبنودها متجمّعة. */
+function unitsList(token, f) {
+  const u = auth_(token, 'units');
+  f = f || {};
+  const map = {}, out = [], od = overdueDays_();
+  scopedEntries_(u).forEach(function (e) {
+    if (f.sector && e.sector !== f.sector) return;
+    const k = e.sector + '|' + String(e.unit).trim().toUpperCase().replace(/\s+/g, '');
+    let g = map[k];
+    if (!g) { g = map[k] = { unit: String(e.unit).trim(), sector: e.sector, items: [] }; out.push(g); }
+    const c = clientEntry_(e);
+    g.items.push({ id: c.id, item: c.item, qty: c.qty, supStatus: c.supStatus, hoStatus: c.hoStatus, flag: c.flag, overdue: c.overdue,
+      lastCheck: c.lastCheck || '', lastCheckBy: c.lastCheckBy || '', guardName: c.guardName, guardDate: c.guardDate, hasPhoto: c.hasPhoto, notes: c.notes || '' });
+  });
+  let list = out;
+  if (f.q) {
+    const q = String(f.q).toLowerCase();
+    list = list.filter(function (g) { return [g.unit, g.sector].concat(g.items.map(function (x) { return x.item + ' ' + x.id + ' ' + x.guardName; })).join(' ').toLowerCase().indexOf(q) >= 0; });
+  }
+  if (f.status === 'flagged') list = list.filter(function (g) { return g.items.some(function (x) { return x.flag; }); });
+  if (f.status === 'overdue') list = list.filter(function (g) { return g.items.some(function (x) { return x.overdue; }); });
+  if (f.status === 'pending') list = list.filter(function (g) { return g.items.some(function (x) { return x.supStatus === SUP.pending; }); });
+  list.sort(function (a, b) { return a.sector === b.sector ? (a.unit < b.unit ? -1 : 1) : (a.sector < b.sector ? -1 : 1); });
+  return { total: list.length, overdueDays: od, units: list.slice(0, 1500) };
 }
 
 function getEntry(token, id) {
