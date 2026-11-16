@@ -122,6 +122,14 @@ tr.click:hover td{background:var(--surface-2)}
 .pcard .t{font-weight:700}
 .pcard .m{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 12px}
 .pcard .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ucard{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-inline-start:4px solid var(--steel);border-radius:12px;background:var(--surface-2)}
+.ucard.flag{border-inline-start-color:var(--red)}.ucard.late{border-inline-start-color:var(--amber)}
+.uh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px}
+.uh .u{font-weight:800;font-size:16px}.uh .m{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center}
+.ucard .pcard{padding:9px 10px}
+tr.ugh td{background:var(--surface-2);font-weight:700;border-top:2px solid var(--line)}
+tr.ugh td .m{font-weight:500;font-size:12.5px;color:var(--muted);margin-inline-start:8px}
+#aUnitItems{display:grid;gap:8px}
 @media (max-width:520px){.pcard{grid-template-columns:1fr}.pcard .btns{justify-content:stretch}.pcard .btns button{flex:1}}
 .photo-in{position:relative;display:flex;gap:12px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:10px;cursor:pointer}
 .photo-in input{position:absolute;inset:0;opacity:0;cursor:pointer}
@@ -229,6 +237,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <div class="actions wide"><button class="primary" id="aSave">تسجيل الحصر</button></div>
       <div class="status err wide" id="aMsg"></div>
     </form>
+    <div id="aUnitItems"></div>
   </section>
 
   <!-- المراجعة -->
@@ -520,6 +529,29 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
   function entryRows(list){ return list.map(function(e){ return ['<span class="num">'+esc(e.unit)+'</span>', bd(e.sector), esc(e.item)+(e.hasPhoto ? " 📷" : "")+" "+flagPill(e.flag), '<span class="num">'+e.qty+'</span>', esc(e.guardName), supPill(e.supStatus), hoPill(e.hoStatus)]; }); }
   var ENTRY_HEADS = ["الوحدة","القطاع","الصنف","الكمية","سجّله","حالة المشرف","حالة المطابقة"];
+  // ===== تجميع البنود تحت الوحدة =====
+  var ITEM_HEADS = ["الصنف","الكمية","سجّله","حالة المشرف","حالة المطابقة"];
+  function itemRow(e){ return [esc(e.item)+(e.hasPhoto ? " 📷" : "")+" "+flagPill(e.flag), '<span class="num">'+e.qty+'</span>', esc(e.guardName), supPill(e.supStatus), hoPill(e.hoStatus)]; }
+  function unitKey(e){ return String(e.sector) + "|" + String(e.unit || "").trim().toUpperCase().replace(/\s+/g, ""); }
+  function groupByUnit(list){
+    var map = {}, out = [];
+    list.forEach(function(e){ var k = unitKey(e); if(!map[k]){ map[k] = { unit: e.unit, sector: e.sector, items: [] }; out.push(map[k]); } map[k].items.push(e); });
+    return out;
+  }
+  function unitSummary(g){
+    var qty = g.items.reduce(function(s, e){ return s + (Number(e.qty) || 0); }, 0), flags = g.items.filter(function(e){ return e.flag; }).length;
+    return '<span class="num">'+g.items.length+'</span> بند · <span class="num">'+qty+'</span> قطعة'+(flags ? ' <span class="pill p-red">'+flags+' بلاغ</span>' : "");
+  }
+  // جدول متجمّع: سطر عنوان لكل وحدة وتحته بنودها
+  function groupedTable(list, heads, rowFn){
+    if(!list.length) return '<div class="empty">لا توجد سجلات لعرضها حاليًا.</div>';
+    var n = heads.length;
+    return '<div class="tablewrap"><table><thead><tr>'+heads.map(function(h){ return "<th>"+esc(h)+"</th>"; }).join("")+'</tr></thead><tbody>' +
+      groupByUnit(list).map(function(g){
+        return '<tr class="ugh"><td colspan="'+n+'">🏠 <span class="num">'+esc(g.unit)+'</span> · '+bd(g.sector)+'<span class="m">'+unitSummary(g)+'</span></td></tr>' +
+          g.items.map(function(e){ return '<tr class="click" data-id="'+esc(e.id)+'">'+rowFn(e).map(function(c){ return "<td>"+c+"</td>"; }).join("")+'</tr>'; }).join("");
+      }).join("") + '</tbody></table></div>';
+  }
 
   // ================================================================ login
   function showLock(mode){
@@ -607,13 +639,30 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     run("addEntry", TOKEN, d, aPhoto).then(function(r){
       toast("اتسجل الحصر (" + r.id + ") ودخل المرور الدوري.");
       $("#aItem").value = ""; $("#aQty").value = 1; $("#aNotes").value = ""; aPhoto = null; var pv = $("#aPv"); pv.style.backgroundImage = ""; pv.textContent = "مفيش صورة";
+      drawUnitItems();
     }).catch(function(err){ $("#aMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "تسجيل الحصر"); });
   });
+
+  // بنود الوحدة اللي بتسجّلها دلوقتي، متجمّعة تحت الفورم
+  var uiT = null;
+  function drawUnitItems(){
+    var unit = $("#aUnit").value.trim(), sec = $("#aSector").value, box = $("#aUnitItems");
+    if(!unit || !sec){ box.innerHTML = ""; return; }
+    var k = unitKey({ unit: unit, sector: sec });
+    run("myEntries", TOKEN).then(function(list){
+      if(unitKey({ unit: $("#aUnit").value.trim(), sector: $("#aSector").value }) !== k) return;
+      var g = { unit: unit, sector: sec, items: list.filter(function(e){ return unitKey(e) === k; }) };
+      box.innerHTML = g.items.length ? '<div class="ucard"><div class="uh"><div><div class="u">🏠 بنود الوحدة <span class="num">'+esc(unit)+'</span></div><div class="m"><span>'+bd(sec)+'</span><span>'+unitSummary(g)+'</span></div></div></div>' +
+        g.items.map(function(e){ return '<div class="pcard click" data-id="'+esc(e.id)+'"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span>'+(e.hasPhoto ? " 📷" : "")+'</div><div class="m"><span class="num">'+esc(e.id)+'</span><span class="num">'+esc(e.guardDate)+'</span></div></div><div>'+supPill(e.supStatus)+'</div></div>'; }).join("") + '</div>' : "";
+    }).catch(function(){});
+  }
+  $("#aUnit").addEventListener("input", function(){ clearTimeout(uiT); uiT = setTimeout(drawUnitItems, 500); });
+  $("#aSector").addEventListener("change", drawUnitItems);
 
   function loadMine(){
     $("#mineTable").innerHTML = '<div class="empty">بيحمّل…</div>';
     run("myEntries", TOKEN).then(function(list){
-      $("#mineTable").innerHTML = table(["رقم القيد"].concat(ENTRY_HEADS), list.map(function(e, i){ return ['<span class="num">'+esc(e.id)+'</span>'].concat(entryRows([e])[0]); }), function(i){ return ' class="click" data-id="'+esc(list[i].id)+'"'; });
+      $("#mineTable").innerHTML = groupedTable(list, ["رقم القيد"].concat(ITEM_HEADS), function(e){ return ['<span class="num">'+esc(e.id)+'</span>'].concat(itemRow(e)); });
     }).catch(function(err){ toast(errMsg(err)); });
   }
 
@@ -624,13 +673,30 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
   function drawReview(r){
     $("#rvCount").textContent = r.pending.length;
-    $("#rvList").innerHTML = r.pending.length ? r.pending.map(function(e){
-      return '<div class="pcard"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span></div><div class="m"><span class="num">'+esc(e.unit)+'</span><span>'+bd(e.sector)+'</span><span>'+esc(e.guardName)+' · <span class="num">'+esc(e.guardDate)+'</span></span>'+(e.notes ? "<span>"+esc(e.notes)+"</span>" : "")+'</div></div>' +
-        '<div class="btns">'+(e.hasPhoto ? '<button class="sm ghost" type="button" data-open="'+esc(e.id)+'">📷 الصورة</button>' : "")+'<button class="sm ok" type="button" data-review="1" data-id="'+esc(e.id)+'">اعتماد</button><button class="sm bad" type="button" data-review="0" data-id="'+esc(e.id)+'">رفض</button></div></div>';
+    $("#rvList").innerHTML = r.pending.length ? groupByUnit(r.pending).map(function(g){
+      return '<div class="ucard"><div class="uh"><div><div class="u">🏠 <span class="num">'+esc(g.unit)+'</span></div><div class="m"><span>'+bd(g.sector)+'</span><span>'+unitSummary(g)+'</span></div></div>' +
+        (g.items.length > 1 ? '<div class="btns"><button class="sm ok" type="button" data-review-all="'+esc(g.items.map(function(e){ return e.id; }).join(","))+'">اعتماد كل بنود الوحدة</button></div>' : "") + '</div>' +
+        g.items.map(function(e){
+          return '<div class="pcard"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span></div><div class="m"><span>'+esc(e.guardName)+' · <span class="num">'+esc(e.guardDate)+'</span></span>'+(e.notes ? "<span>"+esc(e.notes)+"</span>" : "")+'</div></div>' +
+            '<div class="btns">'+(e.hasPhoto ? '<button class="sm ghost" type="button" data-open="'+esc(e.id)+'">📷 الصورة</button>' : "")+'<button class="sm ok" type="button" data-review="1" data-id="'+esc(e.id)+'">اعتماد</button><button class="sm bad" type="button" data-review="0" data-id="'+esc(e.id)+'">رفض</button></div></div>';
+        }).join("") + '</div>';
     }).join("") : '<div class="empty">مفيش قيود مستنية مراجعة. 👍</div>';
-    $("#rvDone").innerHTML = table(ENTRY_HEADS.concat(["المشرف"]), r.done.map(function(e){ return entryRows([e])[0].concat([esc(e.supName)+' · <span class="num">'+esc(e.supDate)+'</span>']); }), function(i){ return ' class="click" data-id="'+esc(r.done[i].id)+'"'; });
+    $("#rvDone").innerHTML = groupedTable(r.done, ITEM_HEADS.concat(["المشرف"]), function(e){ return itemRow(e).concat([esc(e.supName)+' · <span class="num">'+esc(e.supDate)+'</span>']); });
+  }
+  // تشغيل نفس العملية على كل بنود الوحدة واحدة ورا التانية
+  function runEach(fn, ids, arg){
+    var last = null;
+    return ids.reduce(function(p, id){ return p.then(function(){ return run(fn, TOKEN, id, arg).then(function(r){ last = r; }); }); }, Promise.resolve()).then(function(){ return last; });
   }
   $("#rvList").addEventListener("click", function(e){
+    var all = e.target.closest("button[data-review-all]");
+    if(all){
+      var ids = all.getAttribute("data-review-all").split(",");
+      all.closest(".ucard").querySelectorAll("button").forEach(function(x){ x.disabled = true; }); all.textContent = "بيعتمد…";
+      runEach("review", ids, true).then(function(r){ if(r) drawReview(r); toast("اتعتمدت " + ids.length + " بنود للوحدة، ودخلت المرور الدوري."); })
+        .catch(function(err){ toast(errMsg(err)); loadReview(); });
+      return;
+    }
     var b = e.target.closest("button[data-review]"); if(!b) return;
     var ap = b.getAttribute("data-review") === "1";
     b.closest(".btns").querySelectorAll("button").forEach(function(x){ x.disabled = true; });
@@ -650,12 +716,19 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(!sec){ $("#pList").innerHTML = '<div class="empty">اختار القطاع الأول لعرض عناصر المرور الخاصة بيه.</div>'; return; }
     store.set("mt.psector", sec); s.className = "status"; s.innerHTML = '<span class="spin"></span>';
     run("patrolList", TOKEN, sec, $("#pUnit").value.trim(), B.can.add && $("#pMineOnly").checked).then(function(list){
-      s.textContent = list.length + " عنصر معتمد";
-      $("#pList").innerHTML = list.length ? list.map(function(e){
-        var last = e.lastCheck ? 'آخر مرور: <span class="num">' + esc(e.lastCheck) + "</span> — " + esc(e.lastCheckBy) : "لسه مفيش مرور";
-        return '<div class="pcard'+(e.flag ? " flag" : e.overdue ? " late" : "")+'"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span> '+flagPill(e.flag)+(e.overdue ? ' <span class="pill p-amber">متأخر ⏱</span>' : "")+'</div>' +
-          '<div class="m"><span class="num">'+esc(e.unit)+'</span><span>'+bd(e.sector)+'</span><span>'+last+'</span></div></div>' +
-          '<div class="btns"><button class="sm ok" type="button" data-p="موجود" data-id="'+esc(e.id)+'">لسه موجود</button><button class="sm bad" type="button" data-p="مفقود" data-id="'+esc(e.id)+'">مفقود</button><button class="sm warn" type="button" data-p="تالف" data-id="'+esc(e.id)+'">تالف</button></div></div>';
+      var groups = groupByUnit(list);
+      s.textContent = list.length + " عنصر معتمد في " + groups.length + " وحدة";
+      $("#pList").innerHTML = list.length ? groups.map(function(g){
+        var anyFlag = g.items.some(function(e){ return e.flag; }), anyLate = g.items.some(function(e){ return e.overdue; });
+        var okIds = g.items.filter(function(e){ return !e.flag; }).map(function(e){ return e.id; });   // اللي عليه بلاغ مفقود/تالف ما يتعلمش موجود مع الكل
+        return '<div class="ucard'+(anyFlag ? " flag" : anyLate ? " late" : "")+'"><div class="uh"><div><div class="u">🏠 <span class="num">'+esc(g.unit)+'</span></div><div class="m"><span>'+bd(g.sector)+'</span><span>'+unitSummary(g)+'</span></div></div>' +
+          (okIds.length > 1 ? '<div class="btns"><button class="sm ok" type="button" data-p-all="'+esc(okIds.join(","))+'">'+(okIds.length < g.items.length ? 'باقي البنود لسه موجودة' : 'كل البنود لسه موجودة')+'</button></div>' : "") + '</div>' +
+          g.items.map(function(e){
+            var last = e.lastCheck ? 'آخر مرور: <span class="num">' + esc(e.lastCheck) + "</span> — " + esc(e.lastCheckBy) : "لسه مفيش مرور";
+            return '<div class="pcard'+(e.flag ? " flag" : e.overdue ? " late" : "")+'"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span> '+flagPill(e.flag)+(e.overdue ? ' <span class="pill p-amber">متأخر ⏱</span>' : "")+'</div>' +
+              '<div class="m"><span>'+last+'</span></div></div>' +
+              '<div class="btns"><button class="sm ok" type="button" data-p="موجود" data-id="'+esc(e.id)+'">لسه موجود</button><button class="sm bad" type="button" data-p="مفقود" data-id="'+esc(e.id)+'">مفقود</button><button class="sm warn" type="button" data-p="تالف" data-id="'+esc(e.id)+'">تالف</button></div></div>';
+          }).join("") + '</div>';
       }).join("") : '<div class="empty">مفيش عناصر معتمدة نهائيًا في القطاع ده'+($("#pUnit").value.trim() ? " والوحدة دي" : "")+'.</div>';
     }).catch(function(err){ s.className = "status err"; s.textContent = errMsg(err); });
   }
@@ -664,6 +737,14 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   $("#pMineOnly").addEventListener("change", loadPatrol);
   var armed = null;
   $("#pList").addEventListener("click", function(e){
+    var all = e.target.closest("button[data-p-all]");
+    if(all){
+      var ids = all.getAttribute("data-p-all").split(",");
+      all.closest(".ucard").querySelectorAll("button").forEach(function(x){ x.disabled = true; }); all.textContent = "بيسجّل…";
+      runEach("patrol", ids, "موجود").then(function(){ toast("اتسجل المرور على " + ids.length + " بنود ✓"); loadPatrol(); loadPatrolMine(); })
+        .catch(function(err){ toast(errMsg(err)); loadPatrol(); });
+      return;
+    }
     var b = e.target.closest("button[data-p]"); if(!b) return;
     var st = b.getAttribute("data-p");
     if(st !== "موجود" && armed !== b){ armed = b; b.textContent = "اضغط تاني للتأكيد"; setTimeout(function(){ if(armed === b){ armed = null; b.textContent = st; } }, 4000); return; }
@@ -696,7 +777,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     run("searchEntries", TOKEN, allFilters(), allOffset).then(function(r){
       allList = allList.concat(r.items); allOffset += r.items.length;
       $("#fCount").textContent = fmt(r.total) + " قيد";
-      $("#allTable").innerHTML = table(["رقم القيد"].concat(ENTRY_HEADS), allList.map(function(e){ return ['<span class="num">'+esc(e.id)+'</span>'].concat(entryRows([e])[0]); }), function(i){ return ' class="click" data-id="'+esc(allList[i].id)+'"'; });
+      $("#allTable").innerHTML = groupedTable(allList, ["رقم القيد"].concat(ITEM_HEADS), function(e){ return ['<span class="num">'+esc(e.id)+'</span>'].concat(itemRow(e)); });
       $("#allMore").hidden = allOffset >= r.total;
     }).catch(function(err){ toast(errMsg(err)); });
   }
