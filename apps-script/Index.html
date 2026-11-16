@@ -122,6 +122,9 @@ tr.click:hover td{background:var(--surface-2)}
 .pcard .t{font-weight:700}
 .pcard .m{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 12px}
 .pcard .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.seg{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);padding:9px 8px;border-radius:9px}
+.seg button.on{background:var(--brand);color:var(--brand-ink)}
 .ucard{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-inline-start:4px solid var(--steel);border-radius:12px;background:var(--surface-2)}
 .ucard.flag{border-inline-start-color:var(--red)}.ucard.late{border-inline-start-color:var(--amber)}
 .uh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px}
@@ -212,13 +215,8 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 
   <nav class="tabs" id="tabs" role="tablist">
     <button role="tab" data-view="add">تسجيل حصر</button>
-    <button role="tab" data-view="review">المراجعة</button>
     <button role="tab" data-view="patrol">المرور الدوري</button>
-    <button role="tab" data-view="mine">قيودي</button>
     <button role="tab" data-view="dash">لوحة المتابعة</button>
-    <button role="tab" data-view="units">الوحدات</button>
-    <button role="tab" data-view="all">كل القيود</button>
-    <button role="tab" data-view="events">جولات المرور</button>
     <button role="tab" data-view="audits">زيارات التدقيق</button>
     <button role="tab" data-view="cctv">لقطات الكاميرات</button>
     <button role="tab" data-view="admin">المستخدمين والإعدادات</button>
@@ -254,7 +252,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   <!-- المرور الدوري -->
   <section data-v="patrol" style="display:grid;gap:14px" hidden>
     <div class="card">
-      <h2>المرور الدوري على المتروكات المعتمدة</h2>
+      <h2>المرور الدوري على المتروكات</h2>
       <p class="hint">الهدف التأكد إن كل حاجة لسه في مكانها. اختار القطاع (والوحدة لو عايز)، وسجّل حالة كل عنصر. كل مرور بيوصل لمشرف أمن إعمار بتوقيته.</p>
       <div class="bar-row">
         <label class="f">القطاع<select id="pSector"></select></label>
@@ -265,7 +263,13 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <div class="status" id="pStatus"></div>
       <div class="plist" id="pList"></div>
     </div>
-    <div class="card"><h2>جولاتي الأخيرة</h2><div id="pMine"></div></div>
+    <div class="card" id="pMineCard"><h2>جولاتي الأخيرة</h2><div id="pMine"></div></div>
+    <div class="card" id="evCard">
+      <h2>سجل جولات المرور</h2>
+      <p class="hint">كل مرور بيظهر هنا فورًا بتوقيته، علشان تتابع انتظام الجولات أول بأول.</p>
+      <div class="actions"><button class="sm" id="csvPatrols" type="button" hidden>⭳ تحميل Excel (CSV)</button></div>
+      <div id="evTable"></div>
+    </div>
   </section>
 
   <!-- قيودي -->
@@ -275,6 +279,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   </section>
 
   <!-- لوحة المتابعة -->
+  <div class="seg" id="dashSeg" hidden></div>
   <section data-v="dash" style="display:grid;gap:14px" hidden>
     <div class="kpis" id="dKpis"></div>
     <div class="card">
@@ -292,8 +297,9 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     <div class="bar-row">
       <label class="f grow">بحث برقم الوحدة أو الصنف<input id="uQ" type="search" dir="auto"></label>
       <label class="f">القطاع<select id="uSector"></select></label>
-      <label class="f">عرض<select id="uStatus"><option value="">كل الوحدات</option><option value="flagged">فيها بلاغ مفقود / تالف</option><option value="overdue">متأخر عليها مرور</option><option value="pending">فيها بنود قيد المراجعة</option></select></label>
+      <label class="f">عرض<select id="uStatus"><option value="">كل الوحدات</option><option value="flagged">فيها بلاغ مفقود / تالف</option><option value="overdue">متأخر عليها مرور</option></select></label>
     </div>
+    <div class="actions"><button class="sm" id="csvUnits" type="button" hidden>⭳ تحميل Excel (CSV)</button><button class="sm ghost" id="copyUnits" type="button" hidden>نسخ الجدول</button></div>
     <div class="kpis" id="uKpis"></div>
     <span class="status" id="uCount"></span>
     <div class="plist" id="uList"></div>
@@ -316,12 +322,6 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   </section>
 
   <!-- جولات المرور -->
-  <section class="card" data-v="events" hidden>
-    <h2>جولات المرور الدوري</h2>
-    <p class="hint">كل مرور بيظهر هنا فورًا بتوقيته، علشان تتابع انتظام الجولات أول بأول.</p>
-    <div class="actions"><button class="sm" id="csvPatrols" type="button" hidden>⭳ تحميل Excel (CSV)</button></div>
-    <div id="evTable"></div>
-  </section>
 
   <!-- زيارات التدقيق -->
   <section data-v="audits" style="display:grid;gap:14px" hidden>
@@ -469,13 +469,8 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var c = b.can, t = [];
     if(b.me.role === "admin") t.push("dash");
     if(c.add) t.push("add");
-    if(c.review) t.push("review");
-    if(c.patrol) t.push("patrol");
-    if(c.dash && b.me.role !== "admin") t.push("dash");
-    if(c.add) t.push("mine");
-    if(c.units) t.push("units");
-    if(c.viewAll) t.push("all");
-    if(c.events) t.push("events");
+    if(c.patrol || c.events) t.push("patrol");
+    if((c.dash || c.units) && b.me.role !== "admin") t.push("dash");
     if(c.auditsView || c.audit) t.push("audits");
     if(c.cctv) t.push("cctv");
     if(b.me.role === "admin") t.push("admin");
@@ -600,12 +595,22 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 
   // ================================================================ views
   var current = "";
+  // لوحة المتابعة فيها: الملخص والتنبيهات + الوحدات + كل القيود
+  var DSUB_LABEL = { dash: "الملخص والتنبيهات", units: "الوحدات", all: "كل القيود" };
+  var dashSub = store.get("mt.dsub") || "dash";
+  function dashSubs(){ var c = B.can, a = []; if(c.dash || B.me.role === "admin") a.push("dash"); if(c.units){ a.push("units"); a.push("all"); } return a; }
   function showView(v){
     current = v;
     $$("#tabs button").forEach(function(b){ b.setAttribute("aria-selected", String(b.getAttribute("data-view") === v)); });
-    $$("[data-v]").forEach(function(s){ s.hidden = s.getAttribute("data-v") !== v; });
-    ({ add: loadAdd, review: loadReview, patrol: loadPatrolMine, mine: loadMine, dash: loadDash, all: function(){ loadAll(true); }, units: loadUnits, events: loadEvents, audits: loadAudits, cctv: loadCctv, admin: loadAdmin }[v] || function(){})();
+    var sec = v, subs = dashSubs();
+    if(v === "dash"){ if(subs.indexOf(dashSub) < 0) dashSub = subs[0]; sec = dashSub; }
+    $$("[data-v]").forEach(function(s){ s.hidden = s.getAttribute("data-v") !== sec; });
+    var seg = $("#dashSeg");
+    seg.hidden = v !== "dash" || subs.length < 2;
+    seg.innerHTML = subs.map(function(k){ return '<button type="button" class="'+(k === dashSub ? "on" : "")+'" data-dsub="'+k+'">'+DSUB_LABEL[k]+'</button>'; }).join("");
+    ({ add: loadAdd, patrol: loadPatrolTab, dash: loadDash, all: function(){ loadAll(true); }, units: loadUnits, audits: loadAudits, cctv: loadCctv, admin: loadAdmin }[sec] || function(){})();
   }
+  $("#dashSeg").addEventListener("click", function(e){ var b = e.target.closest("button[data-dsub]"); if(!b) return; dashSub = b.getAttribute("data-dsub"); store.set("mt.dsub", dashSub); showView("dash"); });
   $("#tabs").addEventListener("click", function(e){ var b = e.target.closest("button[data-view]"); if(b) showView(b.getAttribute("data-view")); });
 
   function start(){
@@ -617,10 +622,10 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(!tabs.length){ $$("[data-v]").forEach(function(s){ s.hidden = true; }); toast("حسابك لسه ملهوش صلاحيات. كلّم المكتب الرئيسي."); return; }
     options($("#aSector"), B.sectors, "اختار القطاع"); options($("#aItem"), B.items, "اختار الصنف");
     options($("#pSector"), B.sectors, "اختار القطاع", store.get("mt.psector")); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); options($("#cSector"), B.sectors, "كل القطاعات");
-    $("#fStatus").innerHTML = '<option value="">كل الحالات</option>' + ["قيد المراجعة","معتمد","مرفوض","تمت المطابقة"].map(function(s){ return "<option>"+s+"</option>"; }).join("") + '<option value="flagged">بلاغات (مفقود / تالف)</option>';
+    $("#fStatus").innerHTML = '<option value="">كل الحالات</option>' + ["معتمد","مرفوض"].map(function(s){ return "<option>"+s+"</option>"; }).join("") + '<option value="flagged">بلاغات (مفقود / تالف)</option>';
     $("#auRating").innerHTML = B.ratings.map(function(r){ return "<option>"+esc(r)+"</option>"; }).join("");
     $("#auditForm").hidden = !B.can.audit; $("#pMineRow").hidden = !B.can.add;
-    ["#csvEntries","#copyEntries","#csvPatrols","#csvAudits"].forEach(function(s){ $(s).hidden = !B.can.export; });
+    ["#csvEntries","#copyEntries","#csvPatrols","#csvAudits","#csvUnits","#copyUnits"].forEach(function(s){ $(s).hidden = !B.can.export; });
     showView(tabs[0]);
     if(B.can.dash) loadAlerts();
   }
@@ -719,6 +724,11 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   });
 
   // ================================================================ patrol
+  function loadPatrolTab(){
+    $("[data-v=patrol] > .card:first-child").hidden = !B.can.patrol; $("#pMineCard").hidden = !B.can.patrol; $("#evCard").hidden = !B.can.events;
+    if(B.can.patrol) loadPatrolMine();
+    if(B.can.events) loadEvents();
+  }
   function loadPatrolMine(){
     if($("#pSector").value) loadPatrol();
     run("myPatrols", TOKEN).then(function(list){
@@ -755,7 +765,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(all){
       var ids = all.getAttribute("data-p-all").split(",");
       all.closest(".ucard").querySelectorAll("button").forEach(function(x){ x.disabled = true; }); all.textContent = "بيسجّل…";
-      runEach("patrol", ids, "موجود").then(function(){ toast("اتسجل المرور على " + ids.length + " بنود ✓"); loadPatrol(); loadPatrolMine(); })
+      runEach("patrol", ids, "موجود").then(function(){ toast("اتسجل المرور على " + ids.length + " بنود ✓"); loadPatrol(); loadPatrolMine(); if(B.can.events) loadEvents(); })
         .catch(function(err){ toast(errMsg(err)); loadPatrol(); });
       return;
     }
@@ -764,7 +774,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(st !== "موجود" && armed !== b){ armed = b; b.textContent = "اضغط تاني للتأكيد"; setTimeout(function(){ if(armed === b){ armed = null; b.textContent = st; } }, 4000); return; }
     armed = null;
     b.closest(".btns").querySelectorAll("button").forEach(function(x){ x.disabled = true; });
-    run("patrol", TOKEN, b.getAttribute("data-id"), st).then(function(){ toast(st === "موجود" ? "اتسجل المرور ✓" : "اتسجل البلاغ: " + st + ". اتبعت تنبيه للمكتب الرئيسي."); loadPatrolMine(); if(B.can.dash) loadAlerts(); })
+    run("patrol", TOKEN, b.getAttribute("data-id"), st).then(function(){ toast(st === "موجود" ? "اتسجل المرور ✓" : "اتسجل البلاغ: " + st + ". اتبعت تنبيه للمكتب الرئيسي."); loadPatrolMine(); if(B.can.events) loadEvents(); if(B.can.dash) loadAlerts(); })
       .catch(function(err){ toast(errMsg(err)); loadPatrol(); });
   });
 
@@ -774,7 +784,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       drawAlerts(d);
       var cov = d.coverage, cc = cov === null ? "" : cov >= 80 ? "good" : cov >= 50 ? "warn" : "bad";
       var k = function(label, v, cls){ return '<div class="kpi '+(cls||"")+'"><span>'+esc(label)+'</span><b class="num">'+v+'</b></div>'; };
-      $("#dKpis").innerHTML = k("إجمالي القيود", fmt(d.total)) + k("قيد المراجعة", fmt(d.pending), d.pending ? "warn" : "") + k("معتمدة ومطابقة", fmt(d.verified), "good") + k("مرفوضة", fmt(d.rejected)) +
+      $("#dKpis").innerHTML = k("إجمالي القيود", fmt(d.total)) + k("معتمدة ومطابقة", fmt(d.verified), "good") + k("مرفوضة", fmt(d.rejected)) +
         k("بلاغات مفقود / تالف", fmt(d.flagged), d.flagged ? "bad" : "") + k("متأخر عليها مرور", fmt(d.overdueCount), d.overdueCount ? "warn" : "") + k("نسبة الالتزام", cov === null ? "—" : cov + "٪", cc);
       $("#dCovHint").textContent = cov === null ? "لا توجد عناصر معتمدة لسه لقياس الالتزام." : (d.verified - d.overdueCount) + " من " + d.verified + " عنصر اتعمل عليهم مرور خلال آخر " + d.overdueDays + " أيام.";
       $("#dCovBar").style.width = (cov || 0) + "%"; $("#dCovBar").style.background = cc === "good" ? "var(--green)" : cc === "warn" ? "var(--amber)" : "var(--red)";
@@ -804,7 +814,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       var gp = g.items.filter(function(x){ return x.supStatus === "قيد المراجعة"; }).length;
       var last = g.items.map(function(x){ return x.lastCheck; }).filter(String).sort().pop();
       return '<div class="ucard'+(gf ? " flag" : gl ? " late" : "")+'"><div class="uh click" data-unit="'+i+'"><div><div class="u">'+(open ? "▾" : "▸")+' 🏠 <span class="num">'+esc(g.unit)+'</span></div>' +
-        '<div class="m"><span>'+bd(g.sector)+'</span><span>'+unitSummary(g)+'</span>'+(gl ? '<span class="pill p-amber">'+gl+' متأخر ⏱</span>' : "")+(gp ? '<span class="pill p-amber">'+gp+' قيد المراجعة</span>' : "")+
+        '<div class="m"><span>'+bd(g.sector)+'</span><span>'+unitSummary(g)+'</span>'+(gl ? '<span class="pill p-amber">'+gl+' متأخر ⏱</span>' : "")+
         '<span>'+(last ? 'آخر مرور: <span class="num">'+esc(last)+'</span>' : "لسه مفيش مرور")+'</span></div></div></div>' +
         (open ? groupedItems(g) : "") + '</div>';
     }).join("") : '<div class="empty">مفيش وحدات بالبحث ده.</div>';
@@ -822,6 +832,9 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var g = unitsData[+h.getAttribute("data-unit")], key = g.sector + "|" + g.unit;
     openUnits[key] = !openUnits[key]; drawUnits(unitsR);
   });
+  function unitsExportFilter(){ return { q: $("#uQ").value.trim(), sector: $("#uSector").value, status: $("#uStatus").value === "flagged" ? "flagged" : "" }; }
+  $("#csvUnits").addEventListener("click", function(){ run("exportEntries", TOKEN, unitsExportFilter()).then(function(rows){ csvDownload(rows, "تقرير_المتروكات"); }).catch(function(err){ toast(errMsg(err)); }); });
+  $("#copyUnits").addEventListener("click", function(){ run("exportEntries", TOKEN, unitsExportFilter()).then(copyRows).catch(function(err){ toast(errMsg(err)); }); });
   $("#uSector").addEventListener("change", loadUnits);
   $("#uStatus").addEventListener("change", loadUnits);
   $("#uQ").addEventListener("input", function(){ clearTimeout(uT); uT = setTimeout(loadUnits, 400); });
@@ -952,7 +965,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   // ================================================================ patrol events / audits
   function loadEvents(){
     run("patrolEvents", TOKEN, 150).then(function(list){
-      $("#evTable").innerHTML = table(["التاريخ","بواسطة","الدور","الشركة","الوحدة / الصنف","الحالة","الكاميرا"], list.map(function(p){ return ['<span class="num">'+esc(p.date)+'</span>', esc(p.by), esc(p.role), esc(p.company || "—"), '<span class="num">'+esc(p.unit)+'</span> — '+esc(p.item), '<span class="pill '+(p.status === "موجود" ? "p-green" : "p-red")+'">'+esc(p.status)+'</span>', p.hasCam ? '<span class="pill p-green">📷 فيه لقطة</span>' : '<span class="pill p-grey">مفيش</span>']; }), function(i){ return ' class="click" data-id="'+esc(list[i].id)+'"'; });
+      $("#evTable").innerHTML = table(["التاريخ","بواسطة","الدور","الوحدة / الصنف","الحالة","الكاميرا"], list.map(function(p){ return ['<span class="num">'+esc(p.date)+'</span>', esc(p.by), esc(p.role), '<span class="num">'+esc(p.unit)+'</span> — '+esc(p.item), '<span class="pill '+(p.status === "موجود" ? "p-green" : "p-red")+'">'+esc(p.status)+'</span>', p.hasCam ? '<span class="pill p-green">📷 فيه لقطة</span>' : '<span class="pill p-grey">مفيش</span>']; }), function(i){ return ' class="click" data-id="'+esc(list[i].id)+'"'; });
     }).catch(function(err){ toast(errMsg(err)); });
   }
   $("#csvPatrols").addEventListener("click", function(){ run("exportPatrols", TOKEN).then(function(rows){ csvDownload(rows, "إشعارات_المرور"); }).catch(function(err){ toast(errMsg(err)); }); });
@@ -993,7 +1006,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     run("savePerms", TOKEN, map).then(function(d){ AD = d; drawAdmin(); toast("اتحفظت الصلاحيات."); }).catch(function(err){ toast(errMsg(err)); }).then(function(){ busy(b, false, "حفظ الصلاحيات"); });
   });
   $("#permReset").addEventListener("click", function(){
-    var def = { add:["sec_sup"], review:[], patrol:["sec_sup","general_supervisor","emaar"], dash:["general_supervisor","emaar"], viewAll:["general_supervisor","emaar"], events:["general_supervisor","emaar"], auditsView:["general_supervisor","emaar"], audit:["emaar"], export:["emaar"], edit:[], cctv:["cctv"], units:["general_supervisor","emaar"] };
+    var def = { add:["sec_sup"], patrol:["sec_sup","general_supervisor","emaar"], dash:["general_supervisor","emaar"], events:["general_supervisor","emaar"], auditsView:["general_supervisor","emaar"], audit:["emaar"], export:["emaar"], edit:[], cctv:["cctv"], units:["general_supervisor","emaar"] };
     drawPerms(def); toast("اتعلّم على الافتراضي. دوس «حفظ الصلاحيات» علشان يتطبّق.");
   });
   function drawSecs(sel){

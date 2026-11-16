@@ -49,11 +49,9 @@ const RATINGS = ['ملتزم', 'يحتاج متابعة', 'غير ملتزم'];
 // الصلاحيات: المكتب الرئيسي بيتحكم فيها من التطبيق (دي القيم الافتراضية بس).
 const PERMS = {
   add: 'تسجيل حصر جديد',
-  review: 'اعتماد القيود القديمة (قيد المراجعة)',
   patrol: 'المرور الدوري',
   dash: 'لوحة المتابعة والتنبيهات',
-  viewAll: 'كل القيود والبحث',
-  events: 'جولات المرور',
+  events: 'سجل كل جولات المرور (في تاب المرور الدوري)',
   auditsView: 'عرض زيارات التدقيق',
   audit: 'تسجيل زيارة تدقيق',
   export: 'تحميل Excel',
@@ -63,10 +61,8 @@ const PERMS = {
 };
 const DEFAULT_CAN = {
   add: ['sec_sup'],
-  review: [],
   patrol: ['sec_sup', 'general_supervisor', 'emaar'],
   dash: ['general_supervisor', 'emaar'],
-  viewAll: ['general_supervisor', 'emaar'],
   events: ['general_supervisor', 'emaar'],
   auditsView: ['general_supervisor', 'emaar'],
   audit: ['emaar'],
@@ -336,7 +332,35 @@ function lists_() {
   return out;
 }
 
+// المراجعة اتلغت (تسجيل المشرف هو الاعتماد): أي قيد قديم لسه «قيد المراجعة» بيتعتمد مرة واحدة ويدخل المرور الدوري.
+function autoApprove_() {
+  const p = PropertiesService.getScriptProperties();
+  if (p.getProperty('AUTO_APPROVED_V1')) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;
+  try {
+    if (p.getProperty('AUTO_APPROVED_V1')) return;
+    const sh = entriesSheet_(), last = sh.getLastRow();
+    if (last >= 2) {
+      const n = last - 1, rows = values_(sh, E_HEADERS.length), now = "'" + stamp_(new Date());
+      const cols = ['حالة المشرف', 'المشرف', 'تاريخ المراجعة', 'حالة المطابقة', 'تاريخ المطابقة'], data = {};
+      cols.forEach(function (h) { data[h] = sh.getRange(2, EC[h] + 1, n, 1).getValues(); });
+      let changed = 0;
+      for (let i = 0; i < n; i++) {
+        if (!rows[i] || !liveRow_(rows[i])) continue;
+        const st = String(data['حالة المشرف'][i][0] || '').trim();
+        if (st && st !== SUP.pending) continue;
+        data['حالة المشرف'][i][0] = SUP.approved; data['المشرف'][i][0] = 'اعتماد تلقائي'; data['تاريخ المراجعة'][i][0] = now;
+        data['حالة المطابقة'][i][0] = HO.done; data['تاريخ المطابقة'][i][0] = now; changed++;
+      }
+      if (changed) cols.forEach(function (h) { sh.getRange(2, EC[h] + 1, n, 1).setValues(data[h]); });
+    }
+    p.setProperty('AUTO_APPROVED_V1', '1');
+  } finally { lock.releaseLock(); }
+}
+
 function boot_(u) {
+  autoApprove_();
   const l = lists_();
   const can = {};
   Object.keys(PERMS).forEach(function (k) { can[k] = can_(u, k); });
@@ -724,7 +748,7 @@ function matches_(e, f) {
   return true;
 }
 function searchEntries(token, f, offset) {
-  const u = auth_(token, 'viewAll');
+  const u = auth_(token, 'units');
   const rows = scopedEntries_(u).filter(function (e) { return matches_(e, f); });
   offset = Number(offset) || 0;
   return { total: rows.length, items: rows.slice(offset, offset + 50).map(clientEntry_) };
@@ -779,7 +803,7 @@ function getEntry(token, id) {
 function mustSee_(u, e) {
   const deny = function () { throw new Error('مش مسموح لحسابك تشوف القيد ده.'); };
   if (!inScope_(u, e.sector) && e.guardUser !== u.username) deny();
-  if (['viewAll', 'dash', 'review', 'edit', 'events', 'cctv'].some(function (k) { return can_(u, k); })) return;
+  if (['units', 'dash', 'edit', 'events', 'cctv'].some(function (k) { return can_(u, k); })) return;
   if (e.guardUser !== u.username && e.hoStatus !== HO.done) deny();
 }
 function entryPhoto(token, id) {
@@ -954,7 +978,7 @@ function saveCctv(token, key, photo, note) {
 }
 
 function cctvPhoto(token, key) {
-  const u = auth_(token, ['cctv', 'viewAll', 'events', 'dash', 'edit']);
+  const u = auth_(token, ['cctv', 'units', 'events', 'dash', 'edit']);
   const sh = visitsSheet_(), c = camMap_()[key];
   if (!c) return '';
   mustScope_(u, String(sh.getRange(c.row, 4).getValue()));
