@@ -230,6 +230,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <label class="f">رقم الوحدة<input id="aUnit" placeholder="مثال: REZZO-014" dir="ltr" style="text-align:right" autocapitalize="characters"></label>
       <label class="f">القطاع<select id="aSector"></select></label>
       <label class="f">الصنف<select id="aItem"></select></label>
+      <label class="f wide" id="aOtherRow" hidden>اكتب اسم الصنف<input id="aOther" maxlength="60" placeholder="الصنف مش موجود في القائمة — اكتبه هنا"></label>
       <label class="f">الكمية<input id="aQty" type="number" min="1" value="1" inputmode="numeric"></label>
       <label class="f wide">ملاحظات<textarea id="aNotes" placeholder="الحالة، اللون، المكان جوه الوحدة…"></textarea></label>
       <label class="photo-in wide"><div class="pv" id="aPv">مفيش صورة</div><div><b>صورة العنصر (اختياري)</b><div class="hint">صوّره في مكانه.</div></div><input type="file" id="aPhoto" accept="image/*" capture="environment" aria-label="صورة العنصر"></label>
@@ -620,7 +621,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $$("#tabs button").forEach(function(b){ b.hidden = tabs.indexOf(b.getAttribute("data-view")) < 0; });
     $("#tabs").hidden = tabs.length < 2;
     if(!tabs.length){ $$("[data-v]").forEach(function(s){ s.hidden = true; }); toast("حسابك لسه ملهوش صلاحيات. كلّم المكتب الرئيسي."); return; }
-    options($("#aSector"), B.sectors, "اختار القطاع"); options($("#aItem"), B.items, "اختار الصنف");
+    options($("#aSector"), B.sectors, "اختار القطاع"); fillItems();
     options($("#pSector"), B.sectors, "اختار القطاع", store.get("mt.psector")); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); options($("#cSector"), B.sectors, "كل القطاعات");
     $("#fStatus").innerHTML = '<option value="">كل الحالات</option>' + ["معتمد","مرفوض"].map(function(s){ return "<option>"+s+"</option>"; }).join("") + '<option value="flagged">بلاغات (مفقود / تالف)</option>';
     $("#auRating").innerHTML = B.ratings.map(function(r){ return "<option>"+esc(r)+"</option>"; }).join("");
@@ -642,8 +643,12 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
 
   // ================================================================ add entry (مشرف الأمن)
-  var aPhoto = null;
+  var aPhoto = null, OTHER = "أخرى";
   function loadAdd(){}
+  // قائمة الأصناف + «أخرى» في الآخر علشان المشرف يكتب صنف مش موجود
+  function fillItems(){ options($("#aItem"), B.items.filter(function(x){ return x !== OTHER; }).concat([OTHER]), "اختار الصنف"); toggleOther(); }
+  function toggleOther(){ var on = $("#aItem").value === OTHER; $("#aOtherRow").hidden = !on; if(!on) $("#aOther").value = ""; }
+  $("#aItem").addEventListener("change", function(){ toggleOther(); if(!$("#aOtherRow").hidden) $("#aOther").focus(); });
   $("#aPhoto").addEventListener("change", function(e){
     var f = e.target.files && e.target.files[0]; e.target.value = ""; if(!f) return;
     shrink(f, 1200, 0.7).then(function(d){ aPhoto = d; var pv = $("#aPv"); pv.textContent = ""; pv.style.backgroundImage = "url('"+d+"')"; }).catch(function(err){ $("#aMsg").textContent = err.message; });
@@ -654,10 +659,11 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(!d.unit){ $("#aMsg").textContent = "اكتب رقم الوحدة."; return; }
     if(!d.sector){ $("#aMsg").textContent = "اختار القطاع."; return; }
     if(!d.item){ $("#aMsg").textContent = "اختار الصنف."; return; }
+    if(d.item === OTHER){ d.item = $("#aOther").value.trim(); d.other = true; if(!d.item){ $("#aMsg").textContent = "اكتب اسم الصنف."; $("#aOther").focus(); return; } }
     var b = $("#aSave"); busy(b, true, "بيسجّل…"); $("#aMsg").textContent = "";
     run("addEntry", TOKEN, d, aPhoto).then(function(r){
       toast("اتسجل الحصر (" + r.id + ") ودخل المرور الدوري.");
-      $("#aItem").value = ""; $("#aQty").value = 1; $("#aNotes").value = ""; aPhoto = null; var pv = $("#aPv"); pv.style.backgroundImage = ""; pv.textContent = "مفيش صورة";
+      $("#aItem").value = ""; toggleOther(); $("#aQty").value = 1; $("#aNotes").value = ""; aPhoto = null; var pv = $("#aPv"); pv.style.backgroundImage = ""; pv.textContent = "مفيش صورة";
       drawUnitItems();
     }).catch(function(err){ $("#aMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "تسجيل الحصر"); });
   });
@@ -1016,7 +1022,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
   $("#uAllSec").addEventListener("change", function(){ $("#uSecs").hidden = this.checked; if(this.checked) $$("#uSecs input").forEach(function(i){ i.checked = false; }); });
   function pickedSecs(){ return $("#uAllSec").checked ? [] : $$("#uSecs input").filter(function(i){ return i.checked; }).map(function(i){ return i.value; }); }
-  function afterLists(d){ AD = d; drawAdmin(); run("whoami", TOKEN).then(function(r){ var tok = TOKEN; B = r; B.token = tok; options($("#aSector"), B.sectors, "اختار القطاع"); options($("#aItem"), B.items, "اختار الصنف"); options($("#pSector"), B.sectors, "اختار القطاع"); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); }); }
+  function afterLists(d){ AD = d; drawAdmin(); run("whoami", TOKEN).then(function(r){ var tok = TOKEN; B = r; B.token = tok; options($("#aSector"), B.sectors, "اختار القطاع"); fillItems(); options($("#pSector"), B.sectors, "اختار القطاع"); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); }); }
   $("[data-v=admin]").addEventListener("click", function(e){ var b = e.target.closest("button[data-val]"); if(!b) return; busy(b, true); run("saveListValue", TOKEN, b.getAttribute("data-kind"), b.getAttribute("data-val"), b.getAttribute("data-on") === "1").then(afterLists).catch(function(err){ toast(errMsg(err)); busy(b, false); }); });
   $("#lsSector").addEventListener("change", function(e){
     var sel = e.target.closest("select[data-sec]"); if(!sel) return; sel.disabled = true;

@@ -588,7 +588,10 @@ function addEntry(token, d, photo) {
   if (!unit) throw new Error('اكتب رقم الوحدة.');
   if (l.sectors.indexOf(sector) < 0) throw new Error('اختار القطاع.');
   mustScope_(u, sector);
-  if (l.items.indexOf(item) < 0) throw new Error('اختار الصنف.');
+  // «أخرى»: المشرف بيكتب الصنف بنفسه لو مش موجود في القائمة
+  if (!item || item === 'أخرى') throw new Error(d.other ? 'اكتب اسم الصنف.' : 'اختار الصنف.');
+  if (l.items.indexOf(item) < 0 && !d.other) throw new Error('اختار الصنف.');
+  if (item.length > 60) throw new Error('اسم الصنف طويل قوي (٦٠ حرف بالكتير).');
   if (!(qty >= 1 && qty <= 9999)) throw new Error('اكتب الكمية (رقم من ١ أو أكتر).');
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
