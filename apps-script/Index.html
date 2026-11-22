@@ -227,12 +227,15 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     <h2>تسجيل حصر جديد</h2>
     <p class="hint">سجّل العناصر المتروكة بالوحدة بعد نهاية الموسم. العنصر يفضل في مكانه، والتسجيل ده بس لحصره، وبيدخل المرور الدوري على طول.</p>
     <form id="addForm" class="fields" autocomplete="off">
-      <label class="f">رقم الوحدة<input id="aUnit" placeholder="مثال: REZZO-014" dir="ltr" style="text-align:right" autocapitalize="characters"></label>
       <label class="f">القطاع<select id="aSector"></select></label>
+      <label class="f">رقم الوحدة
+        <input id="aUnitQ" type="search" dir="ltr" style="text-align:right" placeholder="دوّر في الوحدات…" hidden>
+        <select id="aUnitSel" dir="ltr" hidden></select>
+        <input id="aUnit" placeholder="مثال: REZZO-014" dir="ltr" style="text-align:right" autocapitalize="characters">
+      </label>
       <label class="f">الصنف<select id="aItem"></select></label>
       <label class="f">الكمية<input id="aQty" type="number" min="1" value="1" inputmode="numeric"></label>
       <label class="f wide">ملاحظات<textarea id="aNotes" placeholder="الحالة، اللون، المكان جوه الوحدة…"></textarea></label>
-      <label class="photo-in wide"><div class="pv" id="aPv">مفيش صورة</div><div><b>صورة العنصر (اختياري)</b><div class="hint">صوّره في مكانه.</div></div><input type="file" id="aPhoto" accept="image/*" capture="environment" aria-label="صورة العنصر"></label>
       <div class="actions wide"><button class="primary" id="aSave">تسجيل الحصر</button></div>
       <div class="status err wide" id="aMsg"></div>
     </form>
@@ -347,7 +350,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   <!-- لقطات الكاميرات -->
   <section class="card" data-v="cctv" hidden>
     <h2>لقطات الكاميرات <span class="chip" id="cCount"></span></h2>
-    <p class="hint">كل مرة مشرف الأمن أو المشرف العام أو ظابط الوردية أو مشرف إعمار يدخل وحدة (يسجّل أو يمر)، الزيارة بتظهر هنا. ارفع لقطة واحدة من الكاميرا للزيارة كلها بعد ما يخلص الوحدة.</p>
+    <p class="hint">كل مرة مشرف الأمن أو المشرف العام أو مشرف أمن إعمار يدخل وحدة (يسجّل أو يمر)، الزيارة بتظهر هنا. ارفع لقطة واحدة من الكاميرا للزيارة كلها بعد ما يخلص الوحدة.</p>
     <div class="bar-row">
       <label class="f">القطاع<select id="cSector"></select></label>
       <label class="f grow">رقم الوحدة (اختياري)<input id="cUnit" dir="ltr" style="text-align:right" placeholder="REZZO-014"></label>
@@ -388,6 +391,14 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <div class="tagset" id="lsCompany" hidden></div>
       <p class="hint">الموقوف بيختفي من القوايم، بس بيفضل في القيود القديمة.</p>
     </div>
+    <div class="card">
+      <h2>قايمة الوحدات</h2>
+      <p class="hint">ارفع شيت الوحدات (MSA Units - By Parcel) زي ما هو، وبعدين اربط كل مجتمع بالقطاع بتاعه. المشرف هيختار رقم الوحدة من قايمة القطاع بدل ما يكتبه. القطاع اللي مش مربوط بيفضل الرقم فيه بيتكتب باليد.</p>
+      <label class="f">شيت الوحدات (‎.xlsx)<input type="file" id="unitsFile" accept=".xlsx"></label>
+      <div class="status" id="unitsSt"></div>
+      <div id="cmapBox"></div>
+      <div class="actions" id="cmapAct" hidden><button class="solid" id="cmapSave" type="button">حفظ الربط</button></div>
+    </div>
   </section>
 </div>
 
@@ -404,15 +415,19 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     <div><h3 style="margin-bottom:4px">سجل المرور الدوري</h3><ol class="timeline" id="eChecks"></ol></div>
     <div id="eEditsBox" hidden><h3 style="margin-bottom:4px">سجل التعديلات</h3><ol class="timeline" id="eEdits"></ol></div>
     <form id="eForm" class="note" hidden style="display:grid;gap:10px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface-2)">
-      <h3>تعديل (المكتب الرئيسي)</h3>
+      <h3 id="edTitle">تعديل</h3>
       <div class="fields">
-        <label class="f">رقم الوحدة<input id="edUnit" dir="ltr" style="text-align:right"></label>
         <label class="f">القطاع<select id="edSector"></select></label>
+        <label class="f">رقم الوحدة
+          <input id="edUnitQ" type="search" dir="ltr" style="text-align:right" placeholder="دوّر في الوحدات…" hidden>
+          <select id="edUnitSel" dir="ltr" hidden></select>
+          <input id="edUnit" dir="ltr" style="text-align:right">
+        </label>
         <label class="f">الصنف<select id="edItem"></select></label>
         <label class="f">الكمية<input id="edQty" type="number" min="1"></label>
-        <label class="f">حالة المشرف<select id="edSup"></select></label>
-        <label class="f">حالة المطابقة<select id="edHo"></select></label>
-        <label class="f">الحالة الميدانية<select id="edFlag"><option value="">سليم</option><option>مفقود</option><option>تالف</option></select></label>
+        <label class="f edAdm">حالة المشرف<select id="edSup"></select></label>
+        <label class="f edAdm">حالة المطابقة<select id="edHo"></select></label>
+        <label class="f edAdm">الحالة الميدانية<select id="edFlag"><option value="">سليم</option><option>مفقود</option><option>تالف</option></select></label>
         <label class="f wide">ملاحظات مشرف الأمن<textarea id="edNotes"></textarea></label>
       </div>
       <div class="actions"><button class="solid" id="edSave">حفظ التعديل</button><button class="bad" type="button" id="edDelete">مسح القيد</button></div>
@@ -642,22 +657,50 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
 
   // ================================================================ add entry (مشرف الأمن)
-  var aPhoto = null;
-  function loadAdd(){}
-  $("#aPhoto").addEventListener("change", function(e){
-    var f = e.target.files && e.target.files[0]; e.target.value = ""; if(!f) return;
-    shrink(f, 1200, 0.7).then(function(d){ aPhoto = d; var pv = $("#aPv"); pv.textContent = ""; pv.style.backgroundImage = "url('"+d+"')"; }).catch(function(err){ $("#aMsg").textContent = err.message; });
+  function loadAdd(){ unitPicker("a", $("#aSector").value, $("#aUnit").value); }
+  // ===== قايمة الوحدات حسب القطاع (لو مش مربوطة، بيكتب الرقم بإيده) =====
+  var UNITS = {};
+  function unitsOf(sector){
+    if(!sector) return Promise.resolve([]);
+    if(UNITS[sector]) return Promise.resolve(UNITS[sector]);
+    return run("unitsFor", TOKEN, sector).then(function(l){ UNITS[sector] = l; return l; });
+  }
+  function unitPicker(px, sector, cur){
+    var sel = $("#" + px + "UnitSel"), q = $("#" + px + "UnitQ"), txt = $("#" + px + "Unit");
+    return unitsOf(sector).then(function(list){
+      var on = list.length > 0;
+      sel.hidden = q.hidden = !on; txt.hidden = on;
+      if(!on) return;
+      sel._all = list; q.value = "";
+      fillUnits(sel, list, cur || txt.value);
+    }).catch(function(){ sel.hidden = q.hidden = true; txt.hidden = false; });
+  }
+  function fillUnits(sel, list, cur){
+    cur = String(cur || "").toUpperCase();
+    var has = list.some(function(u){ return u.toUpperCase() === cur; });
+    sel.innerHTML = '<option value="">اختار الوحدة (' + list.length + ')</option>' + (cur && !has ? '<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>' : "") +
+      list.slice(0, 2500).map(function(u){ return '<option value="'+esc(u)+'"'+(u.toUpperCase() === cur ? " selected" : "")+'>'+esc(u)+'</option>'; }).join("");
+  }
+  function unitValue(px){ var sel = $("#" + px + "UnitSel"); return sel.hidden ? $("#" + px + "Unit").value.trim() : sel.value; }
+  ["a", "ed"].forEach(function(px){
+    $("#" + px + "UnitQ").addEventListener("input", function(){
+      var sel = $("#" + px + "UnitSel"), v = this.value.trim().toUpperCase().replace(/\s+/g, "");
+      fillUnits(sel, (sel._all || []).filter(function(u){ return !v || u.toUpperCase().replace(/\s+/g, "").indexOf(v) >= 0; }), sel.value);
+      if(v && sel.options.length === 2) sel.selectedIndex = 1;
+    });
   });
+  $("#aSector").addEventListener("change", function(){ unitPicker("a", this.value, ""); });
+  $("#aUnitSel").addEventListener("change", function(){ $("#aUnit").value = this.value; drawUnitItems(); });
   $("#addForm").addEventListener("submit", function(e){
     e.preventDefault();
-    var d = { unit: $("#aUnit").value.trim(), sector: $("#aSector").value, item: $("#aItem").value, qty: $("#aQty").value, notes: $("#aNotes").value.trim() };
-    if(!d.unit){ $("#aMsg").textContent = "اكتب رقم الوحدة."; return; }
+    var d = { unit: unitValue("a"), sector: $("#aSector").value, item: $("#aItem").value, qty: $("#aQty").value, notes: $("#aNotes").value.trim() };
     if(!d.sector){ $("#aMsg").textContent = "اختار القطاع."; return; }
+    if(!d.unit){ $("#aMsg").textContent = "اختار الوحدة."; return; }
     if(!d.item){ $("#aMsg").textContent = "اختار الصنف."; return; }
     var b = $("#aSave"); busy(b, true, "بيسجّل…"); $("#aMsg").textContent = "";
-    run("addEntry", TOKEN, d, aPhoto).then(function(r){
+    run("addEntry", TOKEN, d).then(function(r){
       toast("اتسجل الحصر (" + r.id + ") ودخل المرور الدوري.");
-      $("#aItem").value = ""; $("#aQty").value = 1; $("#aNotes").value = ""; aPhoto = null; var pv = $("#aPv"); pv.style.backgroundImage = ""; pv.textContent = "مفيش صورة";
+      $("#aItem").value = ""; $("#aQty").value = 1; $("#aNotes").value = "";
       drawUnitItems();
     }).catch(function(err){ $("#aMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "تسجيل الحصر"); });
   });
@@ -665,13 +708,13 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   // بنود الوحدة اللي بتسجّلها دلوقتي، متجمّعة تحت الفورم
   var uiT = null;
   function drawUnitItems(){
-    var unit = $("#aUnit").value.trim(), sec = $("#aSector").value, box = $("#aUnitItems");
+    var unit = unitValue("a"), sec = $("#aSector").value, box = $("#aUnitItems");
     if(!unit || !sec){ box.innerHTML = ""; return; }
     var k = unitKey({ unit: unit, sector: sec });
     run("myEntries", TOKEN).then(function(list){
-      if(unitKey({ unit: $("#aUnit").value.trim(), sector: $("#aSector").value }) !== k) return;
+      if(unitKey({ unit: unitValue("a"), sector: $("#aSector").value }) !== k) return;
       var g = { unit: unit, sector: sec, items: list.filter(function(e){ return unitKey(e) === k; }) };
-      box.innerHTML = g.items.length ? '<div class="ucard"><div class="uh"><div><div class="u">🏠 بنود الوحدة <span class="num">'+esc(unit)+'</span></div><div class="m"><span>'+bd(sec)+'</span><span>'+unitSummary(g)+'</span></div></div></div>' +
+      box.innerHTML = g.items.length ? '<div class="ucard"><div class="uh"><div><div class="u">🏠 بنود الوحدة <span class="num">'+esc(unit)+'</span></div><div class="m"><span>'+bd(sec)+'</span><span>'+unitSummary(g)+'</span><span>دوس على أي بند تعدّله أو تمسحه</span></div></div></div>' +
         g.items.map(function(e){ return '<div class="pcard click" data-id="'+esc(e.id)+'"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span>'+(e.hasPhoto ? " 📷" : "")+'</div><div class="m"><span class="num">'+esc(e.id)+'</span><span class="num">'+esc(e.guardDate)+'</span></div></div><div>'+supPill(e.supStatus)+'</div></div>'; }).join("") + '</div>' : "";
     }).catch(function(){});
   }
@@ -880,10 +923,14 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $("#eCam").innerHTML = e.hasCam ? '<h3 style="margin-bottom:4px">لقطة الكاميرا وقت التسجيل</h3>' + camLine(e, -1) : "";
     $("#eEditsBox").hidden = !r.edits.length;
     $("#eEdits").innerHTML = r.edits.map(function(x){ return '<li><b>'+esc(x.field)+'</b>: «'+esc(x.from)+'» ← «'+esc(x.to)+'» — '+esc(x.by)+' · <span class="num">'+esc(x.at)+'</span></li>'; }).join("");
-    if(B.can.edit){
+    var mine = e.guardUser === B.me.username;
+    if(B.can.edit || mine){
       $("#eForm").hidden = false;
+      $("#edTitle").textContent = B.can.edit ? "تعديل (المكتب الرئيسي)" : "تعديل القيد بتاعك";
+      $$(".edAdm").forEach(function(x){ x.hidden = !B.can.edit; });
       $("#edUnit").value = e.unit; $("#edQty").value = e.qty; $("#edNotes").value = e.notes; $("#edFlag").value = e.flag || "";
       options($("#edSector"), B.sectors.indexOf(e.sector) < 0 ? B.sectors.concat([e.sector]) : B.sectors, null, e.sector);
+      unitPicker("ed", e.sector, e.unit);
       options($("#edItem"), B.items.indexOf(e.item) < 0 ? B.items.concat([e.item]) : B.items, null, e.item);
       options($("#edSup"), ["قيد المراجعة","معتمد","مرفوض"], null, e.supStatus);
       options($("#edHo"), ["بانتظار المطابقة","تمت المطابقة","—"], null, e.hoStatus);
@@ -891,17 +938,18 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     }
   }
   $("#eClose").addEventListener("click", function(){ $("#entryDlg").close(); });
+  $("#edSector").addEventListener("change", function(){ unitPicker("ed", this.value, ""); });
   $("#eForm").addEventListener("submit", function(ev){
     ev.preventDefault();
-    var d = { unit: $("#edUnit").value.trim(), sector: $("#edSector").value, item: $("#edItem").value, qty: $("#edQty").value, notes: $("#edNotes").value.trim(), supStatus: $("#edSup").value, hoStatus: $("#edHo").value, flag: $("#edFlag").value };
+    var d = { unit: unitValue("ed"), sector: $("#edSector").value, item: $("#edItem").value, qty: $("#edQty").value, notes: $("#edNotes").value.trim(), supStatus: $("#edSup").value, hoStatus: $("#edHo").value, flag: $("#edFlag").value };
     var b = $("#edSave"); busy(b, true, "بيحفظ…");
-    run("updateEntry", TOKEN, cur.entry.id, d).then(function(r){ showEntry(r); toast("اتحفظ التعديل واتسجل في سجل التعديلات."); if(current === "all") loadAll(true); loadAlerts(); })
+    run("updateEntry", TOKEN, cur.entry.id, d).then(function(r){ showEntry(r); toast("اتحفظ التعديل واتسجل في سجل التعديلات."); if(current === "all") loadAll(true); if(current === "add") drawUnitItems(); if(B.can.dash) loadAlerts(); })
       .catch(function(err){ $("#eMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "حفظ التعديل"); });
   });
   $("#edDelete").addEventListener("click", function(){
     var b = $("#edDelete");
     if(!delArmed){ delArmed = true; b.textContent = "اضغط تاني للتأكيد"; return; }
-    busy(b, true); run("deleteEntry", TOKEN, cur.entry.id).then(function(){ $("#entryDlg").close(); toast("اتمسح القيد."); if(current === "all") loadAll(true); loadAlerts(); })
+    busy(b, true); run("deleteEntry", TOKEN, cur.entry.id).then(function(){ $("#entryDlg").close(); toast("اتمسح القيد."); if(current === "all") loadAll(true); if(current === "add") drawUnitItems(); if(B.can.dash) loadAlerts(); })
       .catch(function(err){ $("#eMsg").textContent = errMsg(err); busy(b, false); });
   });
 
@@ -981,6 +1029,107 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   });
   $("#csvAudits").addEventListener("click", function(){ run("exportAudits", TOKEN).then(function(rows){ csvDownload(rows, "تقرير_تدقيق_إعمار"); }).catch(function(err){ toast(errMsg(err)); }); });
 
+  function unzip(buf){
+    var dv = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (eocd < 0) throw new Error('الملف ده مش Excel (xlsx).');
+    var n = dv.getUint16(eocd + 10, true), p = dv.getUint32(eocd + 16, true), files = {}, dec = new TextDecoder();
+    for (var k = 0; k < n; k++) {
+      var method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true),
+        xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+      var name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
+      files[name] = { method: method, off: off, csize: csize };
+      p += 46 + nl + xl + cl;
+    }
+    return function read(name){
+      var f = files[name]; if (!f) return Promise.resolve(null);
+      var ln = dv.getUint16(f.off + 26, true), lx = dv.getUint16(f.off + 28, true), data = u8.slice(f.off + 30 + ln + lx, f.off + 30 + ln + lx + f.csize);
+      if (f.method === 0) return Promise.resolve(dec.decode(data));
+      if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('المتصفح ده قديم ومش بيفتح ملفات Excel. جرّب من كروم على الكمبيوتر.'));
+      return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    };
+  }
+  function xmlDoc(s){ return new DOMParser().parseFromString(s, 'application/xml'); }
+  function kids(el, tag){ return Array.prototype.filter.call(el.childNodes, function(c){ return c.nodeType === 1 && (c.localName || c.nodeName.split(':').pop()) === tag; }); }
+  function readXlsx(buf){
+    var read = unzip(buf), out = [];
+    return Promise.all([read('xl/workbook.xml'), read('xl/_rels/workbook.xml.rels'), read('xl/sharedStrings.xml')]).then(function(r){
+      if (!r[0]) throw new Error('الملف ده مش Excel (xlsx).');
+      var rels = {}, shared = [];
+      Array.prototype.forEach.call(xmlDoc(r[1] || '<x/>').getElementsByTagName('Relationship'), function(x){
+        var t = x.getAttribute('Target'); rels[x.getAttribute('Id')] = t.charAt(0) === '/' ? t.slice(1) : 'xl/' + t.replace(/^\.\//, '');
+      });
+      if (r[2]) Array.prototype.forEach.call(xmlDoc(r[2]).documentElement.childNodes, function(si){
+        if (si.nodeType !== 1) return;
+        var txt = ''; (function walk(e){ Array.prototype.forEach.call(e.childNodes, function(c){
+          if (c.nodeType !== 1) return; var ln = c.localName; if (ln === 'rPh') return; if (ln === 't') txt += c.textContent; else walk(c); }); })(si);
+        shared.push(txt);
+      });
+      var sheets = Array.prototype.map.call(xmlDoc(r[0]).getElementsByTagName('sheet'), function(s){
+        return { name: s.getAttribute('name'), path: rels[s.getAttribute('r:id') || s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')] };
+      });
+      return sheets.reduce(function(chain, sh){
+        return chain.then(function(){ return read(sh.path); }).then(function(x){
+          if (!x) return;
+          var rows = [];
+          Array.prototype.forEach.call(xmlDoc(x).getElementsByTagName('row'), function(row){
+            var cells = [];
+            kids(row, 'c').forEach(function(c){
+              var ref = c.getAttribute('r') || '', col = 0, m = ref.match(/^[A-Z]+/);
+              if (m) for (var i = 0; i < m[0].length; i++) col = col * 26 + m[0].charCodeAt(i) - 64; else col = cells.length + 1;
+              var t = c.getAttribute('t'), v = kids(c, 'v')[0], val = v ? v.textContent : '';
+              if (t === 's') val = shared[+val] || '';
+              else if (t === 'inlineStr') { var is = kids(c, 'is')[0]; val = is ? is.textContent : ''; }
+              else if (t === 'b') val = val === '1';
+              else if (t !== 'str' && t !== 'e' && val !== '' && !isNaN(val)) val = +val;
+              cells[col - 1] = val;
+            });
+            rows[(+row.getAttribute('r') || rows.length + 1) - 1] = cells;
+          });
+          out.push({ name: sh.name, rows: rows });
+        });
+      }, Promise.resolve()).then(function(){ return out; });
+    });
+  }
+
+
+  // ===== قايمة الوحدات: رفع الشيت وربط المجتمعات بالقطاعات =====
+  function drawCmap(){
+    var list = AD.communities || [];
+    $("#cmapAct").hidden = !list.length;
+    if(!list.length){ $("#cmapBox").innerHTML = '<div class="empty">لسه ما اترفعش شيت الوحدات.</div>'; return; }
+    var total = list.reduce(function(s, c){ return s + c.units; }, 0), un = list.filter(function(c){ return !c.sector; }).length;
+    $("#cmapBox").innerHTML = '<p class="hint">'+fmt(total)+' وحدة في '+list.length+' مجتمع'+(un ? ' · <b style="color:var(--amber)">'+un+' مش مربوطين بقطاع</b>' : ' · كلهم مربوطين ✓')+'</p>' +
+      '<div class="tablewrap"><table><thead><tr><th>المجتمع (من الشيت)</th><th>عدد الوحدات</th><th>القطاع في البرنامج</th></tr></thead><tbody>' + list.map(function(c){
+        return '<tr><td>'+esc(c.community)+'</td><td class="num">'+c.units+'</td><td><select data-comm="'+esc(c.community)+'"><option value="">— مش مربوط —</option>' +
+          AD.sectors.map(function(x){ return '<option value="'+esc(x)+'"'+(x === c.sector ? " selected" : "")+'>\u2068'+esc(x)+'\u2069</option>'; }).join("") + '</select></td></tr>';
+      }).join("") + '</tbody></table></div>';
+  }
+  $("#cmapSave").addEventListener("click", function(){
+    var map = {}; $$("#cmapBox select[data-comm]").forEach(function(s){ map[s.getAttribute("data-comm")] = s.value; });
+    var b = $("#cmapSave"); busy(b, true, "بيحفظ…");
+    run("saveCommunityMap", TOKEN, map).then(function(d){ AD = d; UNITS = {}; drawAdmin(); toast("اتحفظ ربط المجتمعات بالقطاعات."); }).catch(function(err){ toast(errMsg(err)); }).then(function(){ busy(b, false, "حفظ الربط"); });
+  });
+  $("#unitsFile").addEventListener("change", function(){
+    var f = this.files[0], st = $("#unitsSt"), inp = this; if(!f) return;
+    st.className = "status"; st.innerHTML = '<span class="spin"></span> بيقرا الشيت…';
+    f.arrayBuffer().then(readXlsx).then(function(sheets){
+      var rows = [];
+      sheets.forEach(function(sh){
+        var hi = -1, cu = -1, cc = -1;
+        for(var i = 0; i < Math.min(sh.rows.length, 6) && hi < 0; i++){
+          (sh.rows[i] || []).forEach(function(c, j){ var k = String(c == null ? "" : c).trim().toLowerCase(); if(k === "location code") cu = j; if(k === "community") cc = j; });
+          if(cu >= 0 && cc >= 0) hi = i;
+        }
+        if(hi < 0) return;
+        sh.rows.slice(hi + 1).forEach(function(r){ if(r && r[cu] && r[cc]) rows.push({ unit: String(r[cu]).trim(), community: String(r[cc]).trim() }); });
+      });
+      if(!rows.length) throw new Error("ملقتش في الملف شيت فيه عمودين «Location Code» و«Community».");
+      st.innerHTML = '<span class="spin"></span> بيحفظ ' + fmt(rows.length) + ' وحدة…';
+      return run("importUnits", TOKEN, rows).then(function(d){ AD = d; UNITS = {}; drawAdmin(); st.className = "status"; st.textContent = "✓ اترفعت " + fmt(rows.length) + " وحدة. راجع ربط المجتمعات تحت واضغط «حفظ الربط»."; });
+    }).catch(function(err){ st.className = "status err"; st.textContent = errMsg(err); }).then(function(){ inp.value = ""; });
+  });
+
   // ================================================================ admin: users / settings / lists
   var AD = null, editUser = null, delU = false;
   function loadAdmin(){ run("adminData", TOKEN).then(function(d){ AD = d; drawAdmin(); }).catch(function(err){ toast(errMsg(err)); }); }
@@ -994,6 +1143,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     }).join("");
     $("#lsItem").innerHTML = AD.lists.filter(function(x){ return x.kind === "item"; }).map(tag).join("");
     $("#lsCompany").innerHTML = AD.lists.filter(function(x){ return x.kind === "company"; }).map(tag).join("");
+    drawCmap();
   }
   function drawPerms(p){
     $("#permTable").innerHTML = "<thead><tr><th>الصلاحية</th>" + ROLE_ORDER.map(function(r){ return "<th>"+esc(ROLE_LABEL[r])+"</th>"; }).join("") + "</tr></thead><tbody>" +

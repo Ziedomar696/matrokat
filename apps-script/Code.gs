@@ -18,6 +18,8 @@ const USERS_SHEET = 'المستخدمين';
 const LISTS_SHEET = 'القوائم';
 const SETTINGS_SHEET = 'الإعدادات';
 const VISITS_SHEET = 'لقطات الكاميرات';
+const UNITS_SHEET = 'الوحدات';
+const MAP_KEY = 'ربط المجتمعات بالقطاعات';
 
 const E_HEADERS = ['رقم القيد', 'رقم الوحدة', 'القطاع', 'الصنف', 'الكمية', 'ملاحظات فرد الأمن', 'فرد الأمن', 'حساب فرد الأمن', 'تاريخ الحصر',
   'حالة المشرف', 'المشرف', 'تاريخ المراجعة', 'حالة المطابقة', 'تاريخ المطابقة',
@@ -98,7 +100,6 @@ function doGet() {
 function setup() {
   const ss = ss_();
   entriesSheet_(); patrolsSheet_(); auditsSheet_(); editsSheet_(); usersSheet_(); listsSheet_(); settingsSheet_();
-  folder_('PHOTOS_FOLDER', 'متروكات - صور القيود');
   folder_('CCTV_FOLDER', CCTV_FOLDER_NAME); visitsSheet_();
   const keep = [ENTRIES_SHEET, PATROLS_SHEET, AUDITS_SHEET, EDITS_SHEET, USERS_SHEET, LISTS_SHEET, SETTINGS_SHEET];
   ss.getSheets().forEach(function (s) {
@@ -165,6 +166,7 @@ function listsSheet_() {
     sh.hideColumns(4, 2);
   });
 }
+function unitsSheet_() { return ensureSheet_(UNITS_SHEET, ['الوحدة', 'المجتمع']); }
 function visitsSheet_() { return ensureSheet_(VISITS_SHEET, V_HEADERS, function (sh) { sh.hideColumns(1, 1); sh.hideColumns(8, 1); }); }
 function settingsSheet_() {
   return ensureSheet_(SETTINGS_SHEET, ['الإعداد', 'القيمة'], function (sh) { sh.getRange(2, 1, 1, 2).setValues([['أيام المرور الدوري', '7']]); });
@@ -359,13 +361,110 @@ function autoApprove_() {
   } finally { lock.releaseLock(); }
 }
 
+// صور البنود اتلغت: فولدر الصور بيتنقل للسلة (يرجع منها لحد ٣٠ يوم) والعمود بيتفضّى، مرة واحدة.
+function dropPhotos_() {
+  const p = PropertiesService.getScriptProperties();
+  if (p.getProperty('PHOTOS_DROPPED_V1')) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;
+  try {
+    if (p.getProperty('PHOTOS_DROPPED_V1')) return;
+    const id = p.getProperty('PHOTOS_FOLDER');
+    if (id) { try { DriveApp.getFolderById(id).setTrashed(true); } catch (e) {} p.deleteProperty('PHOTOS_FOLDER'); }
+    const sh = entriesSheet_(), n = sh.getLastRow() - 1;
+    if (n > 0) sh.getRange(2, EC['صورة (Drive ID)'] + 1, n, 1).clearContent();
+    p.setProperty('PHOTOS_DROPPED_V1', '1');
+  } finally { lock.releaseLock(); }
+}
+
 function boot_(u) {
   autoApprove_();
+  dropPhotos_();
   const l = lists_();
   const can = {};
   Object.keys(PERMS).forEach(function (k) { can[k] = can_(u, k); });
   return { me: publicUser_(u), can: can, sectors: l.sectors.filter(function (s) { return inScope_(u, s); }), items: l.items, companies: l.companies,
     overdueDays: overdueDays_(), sup: SUP, ho: HO, ratings: RATINGS };
+}
+
+// ================================================================ قايمة الوحدات (من شيت MSA Units)
+
+function communityMap_() {
+  const cache = CacheService.getScriptCache(), hit = cache.get('cmap');
+  if (hit) return JSON.parse(hit);
+  let m = {};
+  values_(settingsSheet_(), 2).forEach(function (r) { if (String(r[0]).trim() === MAP_KEY) { try { m = JSON.parse(String(r[1])) || {}; } catch (e) {} } });
+  cache.put('cmap', JSON.stringify(m), 300);
+  return m;
+}
+function saveSetting_(key, val) {
+  const sh = settingsSheet_();
+  let r = -1;
+  values_(sh, 1).forEach(function (x, i) { if (String(x[0]).trim() === key) r = i + 2; });
+  if (r > 0) sh.getRange(r, 2).setValue(val); else sh.appendRow([key, val]);
+}
+/** وحدات القطاع = وحدات المجتمعات المربوطة بيه. */
+function sectorUnits_(sector) {
+  const map = communityMap_(), comms = Object.keys(map).filter(function (c) { return map[c] === sector; });
+  if (!comms.length) return [];
+  return values_(unitsSheet_(), 2).filter(function (r) { return comms.indexOf(String(r[1]).trim()) >= 0; }).map(function (r) { return String(r[0]).trim(); });
+}
+function unitsFor(token, sector) {
+  const u = auth_(token);
+  mustScope_(u, sector);
+  return sectorUnits_(sector);
+}
+function normName_(s) { return String(s || '').toLowerCase().replace(/^marassi\s+/, '').replace(/[^a-z0-9]/g, ''); }
+// تخمين القطاع: نفس الاسم بالظبط، ولو فيه أكتر من قطاع بنفس الاسم (BLANCA 1 / 2) لازم الرقم يطابق، وإلا يفضل فاضي للمكتب الرئيسي.
+function nameParts_(s) {
+  const words = String(s || '').toLowerCase().replace(/[-_]+/g, ' ').split(/\s+/).filter(String);
+  const core = [], nums = [];
+  words.forEach(function (w) {
+    if (w === 'marassi' || w === 'the') return;
+    const m = w.match(/^p?(\d+)[a-z]?$/); if (m) { nums.push(m[1]); return; }
+    if (/^(th|sa)$/.test(w)) return;
+    w.split(/(\d+)/).forEach(function (x) { if (/^\d+$/.test(x)) nums.push(x); else if (x.replace(/[^a-z]/g, '')) core.push(x.replace(/[^a-z]/g, '')); });
+  });
+  return { core: core.join(''), nums: nums };
+}
+function guessSector_(community, sectors) {
+  const c = nameParts_(community);
+  if (!c.core) return '';
+  const cand = sectors.filter(function (s) { return nameParts_(s).core === c.core; });
+  if (cand.length === 1) return cand[0];
+  const hit = cand.filter(function (s) { const n = nameParts_(s).nums; return c.nums.length && c.nums.every(function (x) { return n.indexOf(x) >= 0; }); });
+  return hit.length === 1 ? hit[0] : '';
+}
+/** المكتب الرئيسي بيرفع شيت الوحدات: [{unit, community}] (بيستبدل القايمة القديمة). */
+function importUnits(token, rows) {
+  auth_(token, ['admin']);
+  rows = (Array.isArray(rows) ? rows : []).map(function (r) { return [clean_(r.unit, 80).replace(/^Marassi\s+/i, ''), clean_(r.community, 80)]; })
+    .filter(function (r) { return r[0] && r[1]; });
+  if (!rows.length) throw new Error('ملقتش وحدات في الملف.');
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    const sh = unitsSheet_();
+    if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).clearContent();
+    sh.getRange(2, 1, rows.length, 2).setNumberFormat('@').setValues(rows);
+    const map = communityMap_(), sectors = lists_().sectors;
+    rows.forEach(function (r) { if (!(r[1] in map)) map[r[1]] = guessSector_(r[1], sectors); });
+    saveSetting_(MAP_KEY, JSON.stringify(map)); dropCache_('cmap');
+  } finally { lock.releaseLock(); }
+  return adminData(token);
+}
+function saveCommunityMap(token, map) {
+  auth_(token, ['admin']);
+  const sectors = lists_().all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; });
+  const out = {};
+  Object.keys(map || {}).forEach(function (c) { out[clean_(c, 80)] = sectors.indexOf(map[c]) >= 0 ? map[c] : ''; });
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try { saveSetting_(MAP_KEY, JSON.stringify(out)); dropCache_('cmap'); } finally { lock.releaseLock(); }
+  return adminData(token);
+}
+function unitsInfo_() {
+  const counts = {}, map = communityMap_();
+  values_(unitsSheet_(), 2).forEach(function (r) { const c = String(r[1]).trim(); if (c) counts[c] = (counts[c] || 0) + 1; });
+  return Object.keys(counts).sort().map(function (c) { return { community: c, units: counts[c], sector: map[c] || '' }; });
 }
 
 // ---------------------------------------------------------------- login
@@ -417,7 +516,7 @@ function adminData(token) {
   const l = lists_();
   return { users: users_().map(publicUser_), roles: ROLES, lists: l.all.map(function (x) { const o = Object.assign({}, x); delete o.row; return o; }),
     companies: l.companies, sectorCompany: l.sectorCompany, sectors: l.all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; }),
-    overdueDays: overdueDays_(), perms: perms_(), permLabels: PERMS };
+    overdueDays: overdueDays_(), perms: perms_(), permLabels: PERMS, communities: unitsInfo_() };
 }
 
 function saveUser(token, d) {
@@ -581,7 +680,11 @@ function nextId_() {
   return id;
 }
 
-function addEntry(token, d, photo) {
+function mustUnit_(unit, sector) {
+  const list = sectorUnits_(sector);
+  if (list.length && !list.some(function (x) { return x.toUpperCase() === unit; })) throw new Error('اختار الوحدة من القايمة.');
+}
+function addEntry(token, d) {
   const u = auth_(token, 'add');
   const l = lists_();
   const unit = clean_(d.unit).toUpperCase(), sector = clean_(d.sector), item = clean_(d.item), qty = Math.round(Number(d.qty));
@@ -590,10 +693,10 @@ function addEntry(token, d, photo) {
   mustScope_(u, sector);
   if (l.items.indexOf(item) < 0) throw new Error('اختار الصنف.');
   if (!(qty >= 1 && qty <= 9999)) throw new Error('اكتب الكمية (رقم من ١ أو أكتر).');
+  mustUnit_(unit, sector);
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     const id = nextId_();
-    const photoId = photo ? savePhoto_(photo, 'PHOTOS_FOLDER', 'متروكات - صور القيود', id) : '';
     const now = stamp_(new Date());
     const row = new Array(E_HEADERS.length).fill('');
     row[EC['رقم القيد']] = id; row[EC['رقم الوحدة']] = unit; row[EC['القطاع']] = sector; row[EC['الصنف']] = item; row[EC['الكمية']] = String(qty);
@@ -601,7 +704,6 @@ function addEntry(token, d, photo) {
     // مشرف الأمن هو اللي بيسجّل، فالقيد بيتعتمد ويدخل المرور الدوري على طول.
     row[EC['تاريخ الحصر']] = "'" + now; row[EC['حالة المشرف']] = SUP.approved; row[EC['المشرف']] = u.name; row[EC['تاريخ المراجعة']] = "'" + now;
     row[EC['حالة المطابقة']] = HO.done; row[EC['تاريخ المطابقة']] = "'" + now;
-    row[EC['صورة (Drive ID)']] = photoId;
     entriesSheet_().appendRow(row);
     return { id: id };
   } finally { lock.releaseLock(); }
@@ -809,6 +911,7 @@ function mustSee_(u, e) {
 function entryPhoto(token, id) {
   const u = auth_(token);
   const e = entry_(id);
+  return '';   // صور البنود اتلغت
   if (!e || !e.photoId) return '';
   mustSee_(u, e);
   return 'data:image/jpeg;base64,' + Utilities.base64Encode(DriveApp.getFileById(e.photoId).getBlob().getBytes());
@@ -816,12 +919,15 @@ function entryPhoto(token, id) {
 
 /** تعديل كامل من المكتب الرئيسي، وكل تغيير بيتسجل في سجل التعديلات. */
 function updateEntry(token, id, d) {
-  const u = auth_(token, 'edit');
+  const u = auth_(token);
   const l = lists_();
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     const e = entry_(id);
     if (!e) throw new Error('القيد ده مش موجود.');
+    const full = can_(u, 'edit');
+    if (!full && e.guardUser !== u.username) throw new Error('مش مسموح لحسابك تعدّل القيد ده.');
+    if (!full) { d.supStatus = e.supStatus; d.hoStatus = e.hoStatus; d.flag = e.flag; }   // صاحب القيد بيعدّل بياناته بس
     mustScope_(u, e.sector);
     const next = {
       'رقم الوحدة': clean_(d.unit).toUpperCase(), 'القطاع': clean_(d.sector), 'الصنف': clean_(d.item), 'الكمية': String(Math.round(Number(d.qty))),
@@ -831,6 +937,7 @@ function updateEntry(token, id, d) {
     if (!(Number(next['الكمية']) >= 1)) throw new Error('اكتب الكمية.');
     if (next['القطاع'] !== e.sector && l.sectors.indexOf(next['القطاع']) < 0) throw new Error('اختار القطاع.');
     mustScope_(u, next['القطاع']);
+    if (next['رقم الوحدة'] !== e.unit || next['القطاع'] !== e.sector) mustUnit_(next['رقم الوحدة'], next['القطاع']);
     if (next['الصنف'] !== e.item && l.items.indexOf(next['الصنف']) < 0) throw new Error('اختار الصنف.');
     if ([SUP.pending, SUP.approved, SUP.rejected].indexOf(next['حالة المشرف']) < 0) throw new Error('حالة المشرف غير صحيحة.');
     if ([HO.waiting, HO.done, HO.none].indexOf(next['حالة المطابقة']) < 0) throw new Error('حالة المطابقة غير صحيحة.');
@@ -852,11 +959,12 @@ function updateEntry(token, id, d) {
 }
 
 function deleteEntry(token, id) {
-  const u = auth_(token, 'edit');
+  const u = auth_(token);
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     const e = entry_(id);
     if (!e) throw new Error('القيد ده مش موجود.');
+    if (!can_(u, 'edit') && e.guardUser !== u.username) throw new Error('مش مسموح لحسابك تمسح القيد ده.');
     mustScope_(u, e.sector);
     const now = stamp_(new Date());
     entriesSheet_().getRange(e.row, EC['محذوف'] + 1).setValue(u.username + ' ' + now);
