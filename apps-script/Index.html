@@ -647,7 +647,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(B.can.add){ $("#pMineOnly").checked = true; $("#pSector").options[0].textContent = "كل قطاعاتي"; }
     ["#csvEntries","#copyEntries","#csvPatrols","#csvAudits","#csvUnits","#copyUnits"].forEach(function(s){ $(s).hidden = !B.can.export; });
     showView(tabs[0]);
-    if(B.can.dash) loadAlerts();
+    if(B.can.dash && !(current === "dash" && dashSub === "dash")) loadAlerts();   // لوحة المتابعة نفسها بتجيب التنبيهات
   }
 
   // ---------- alerts ----------
@@ -717,7 +717,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var unit = unitValue("a"), sec = $("#aSector").value, box = $("#aUnitItems");
     if(!unit || !sec){ box.innerHTML = ""; return; }
     var k = unitKey({ unit: unit, sector: sec });
-    run("myEntries", TOKEN).then(function(list){
+    run("myEntries", TOKEN, { unit: unit, sector: sec }).then(function(list){
       if(unitKey({ unit: unitValue("a"), sector: $("#aSector").value }) !== k) return;
       var g = { unit: unit, sector: sec, items: list.filter(function(e){ return unitKey(e) === k; }) };
       box.innerHTML = g.items.length ? '<div class="ucard"><div class="uh"><div><div class="u">🏠 بنود الوحدة <span class="num">'+esc(unit)+'</span></div><div class="m"><span>'+bd(sec)+'</span><span>'+unitSummary(g)+'</span></div></div></div>' +
@@ -804,6 +804,9 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
   function loadPatrolMine(){
     if($("#pSector").value || (B.can.add && $("#pMineOnly").checked)) loadPatrol();
+    loadMyPatrols();
+  }
+  function loadMyPatrols(){
     run("myPatrols", TOKEN).then(function(list){
       $("#pMine").innerHTML = table(["التاريخ","الوحدة","الصنف","الحالة"], list.map(function(p){ return ['<span class="num">'+esc(p.date)+'</span>','<span class="num">'+esc(p.unit)+'</span>',esc(p.item),'<span class="pill '+(p.status === "موجود" ? "p-green" : "p-red")+'">'+esc(p.status)+'</span>']; }));
     }).catch(function(){});
@@ -836,9 +839,15 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   $("#pList").addEventListener("click", function(e){
     var all = e.target.closest("button[data-p-all]");
     if(all){
-      var ids = all.getAttribute("data-p-all").split(",");
-      all.closest(".ucard").querySelectorAll("button").forEach(function(x){ x.disabled = true; }); all.textContent = "بيسجّل…";
-      runEach("patrol", ids, "موجود").then(function(){ toast("اتسجل المرور على " + ids.length + " بنود ✓"); loadPatrol(); loadPatrolMine(); if(B.can.events) loadEvents(); })
+      var ucard = all.closest(".ucard");
+      var ids = all.getAttribute("data-p-all").split(",").filter(function(id){ return ucard.querySelector('button[data-p][data-id="'+id+'"]'); });   // اللي اتسجل لوحده ما يتكررش
+      if(!ids.length){ all.closest(".btns").innerHTML = '<span class="pill p-green">✓ اتسجل المرور</span>'; return; }
+      ucard.querySelectorAll("button").forEach(function(x){ x.disabled = true; }); all.textContent = "بيسجّل…";
+      runEach("patrol", ids, "موجود").then(function(){
+        toast("اتسجل المرور على " + ids.length + " بنود ✓");
+        var uc = all.closest(".ucard"); ids.forEach(function(id){ var bb = uc.querySelector('button[data-p][data-id="'+id+'"]'); if(bb){ var c = bb.closest(".pcard"); c.classList.remove("late"); c.querySelector(".btns").innerHTML = '<span class="pill p-green">✓ موجود</span>'; } });
+        all.closest(".btns").innerHTML = '<span class="pill p-green">✓ اتسجل المرور</span>'; loadMyPatrols();
+      })
         .catch(function(err){ toast(errMsg(err)); loadPatrol(); });
       return;
     }
@@ -847,7 +856,13 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(st !== "موجود" && armed !== b){ armed = b; b.textContent = "اضغط تاني للتأكيد"; setTimeout(function(){ if(armed === b){ armed = null; b.textContent = st; } }, 4000); return; }
     armed = null;
     b.closest(".btns").querySelectorAll("button").forEach(function(x){ x.disabled = true; });
-    run("patrol", TOKEN, b.getAttribute("data-id"), st).then(function(){ toast(st === "موجود" ? "اتسجل المرور ✓" : "اتسجل البلاغ: " + st + ". اتبعت تنبيه للمكتب الرئيسي."); loadPatrolMine(); if(B.can.events) loadEvents(); if(B.can.dash) loadAlerts(); })
+    run("patrol", TOKEN, b.getAttribute("data-id"), st).then(function(){
+      toast(st === "موجود" ? "اتسجل المرور ✓" : "اتسجل البلاغ: " + st + ". اتبعت تنبيه للمكتب الرئيسي.");
+      var card = b.closest(".pcard"), t = new Date(), hhmm = ("0" + t.getHours()).slice(-2) + ":" + ("0" + t.getMinutes()).slice(-2);
+      card.classList.remove("late"); card.classList.toggle("flag", st !== "موجود");
+      card.querySelector(".btns").innerHTML = '<span class="pill '+(st === "موجود" ? "p-green" : "p-red")+'">✓ '+esc(st)+' · <span class="num">'+hhmm+'</span></span>';
+      loadMyPatrols();
+    })
       .catch(function(err){ toast(errMsg(err)); loadPatrol(); });
   });
 
@@ -973,13 +988,13 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     ev.preventDefault();
     var d = { unit: unitValue("ed"), sector: $("#edSector").value, item: $("#edItem").value, qty: $("#edQty").value, notes: $("#edNotes").value.trim(), supStatus: $("#edSup").value, hoStatus: $("#edHo").value, flag: $("#edFlag").value };
     var b = $("#edSave"); busy(b, true, "بيحفظ…");
-    run("updateEntry", TOKEN, cur.entry.id, d).then(function(r){ showEntry(r); toast("اتحفظ التعديل واتسجل في سجل التعديلات."); if(current === "all") loadAll(true); if(current === "add") drawUnitItems(); if(current === "mine") loadMine(); if(B.can.dash) loadAlerts(); })
+    run("updateEntry", TOKEN, cur.entry.id, d).then(function(r){ showEntry(r); toast("اتحفظ التعديل واتسجل في سجل التعديلات."); if(current === "all") loadAll(true); if(current === "add") drawUnitItems(); if(current === "mine") loadMine(); if(current === "dash" && B.can.dash) loadAlerts(); })
       .catch(function(err){ $("#eMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "حفظ التعديل"); });
   });
   $("#edDelete").addEventListener("click", function(){
     var b = $("#edDelete");
     if(!delArmed){ delArmed = true; b.textContent = "اضغط تاني للتأكيد"; return; }
-    busy(b, true); run("deleteEntry", TOKEN, cur.entry.id).then(function(){ $("#entryDlg").close(); toast("اتمسح القيد."); if(current === "all") loadAll(true); if(current === "add") drawUnitItems(); if(current === "mine") loadMine(); if(B.can.dash) loadAlerts(); })
+    busy(b, true); run("deleteEntry", TOKEN, cur.entry.id).then(function(){ $("#entryDlg").close(); toast("اتمسح القيد."); if(current === "all") loadAll(true); if(current === "add") drawUnitItems(); if(current === "mine") loadMine(); if(current === "dash" && B.can.dash) loadAlerts(); })
       .catch(function(err){ $("#eMsg").textContent = errMsg(err); busy(b, false); });
   });
 

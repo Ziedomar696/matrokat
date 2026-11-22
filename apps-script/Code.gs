@@ -187,7 +187,13 @@ function values_(sh, width, from) {
   return sh.getRange(start, 1, last - start + 1, width).getValues().map(function (r) { return r.map(fmt_); });
 }
 
-function overdueDays_() {
+// ذاكرة داخل الطلب الواحد: كل قيمة بتتقري مرة واحدة بس (بدل مرة لكل قيد)
+let _memo = {};
+function memo_(k, fn) { if (!Object.prototype.hasOwnProperty.call(_memo, k)) _memo[k] = fn(); return _memo[k]; }
+function forget_(k) { delete _memo[k]; }
+
+function overdueDays_() { return memo_('overdue', overdueDaysRaw_); }
+function overdueDaysRaw_() {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('overdue');
   if (hit) return Number(hit);
@@ -199,7 +205,8 @@ function overdueDays_() {
 
 // ================================================================ users & auth
 
-function users_() {
+function users_() { return memo_('users', usersRaw_); }
+function usersRaw_() {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('users');
   if (hit) return JSON.parse(hit);
@@ -227,7 +234,7 @@ function users_() {
   cache.put('users', JSON.stringify(out), 300);
   return out;
 }
-function dropCache_(k) { CacheService.getScriptCache().remove(k); }
+function dropCache_(k) { CacheService.getScriptCache().remove(k); forget_(k); }
 function findUser_(username) {
   username = String(username || '').trim().toLowerCase();
   return users_().filter(function (u) { return u.username === username; })[0] || null;
@@ -280,7 +287,8 @@ function auth_(token, need) {
 
 // ---------------------------------------------------------------- permissions & sectors
 
-function perms_() {
+function perms_() { return memo_('perms', permsRaw_); }
+function permsRaw_() {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('perms');
   if (hit) return JSON.parse(hit);
@@ -323,7 +331,8 @@ function savePerms(token, map) {
   return adminData(token);
 }
 
-function lists_() {
+function lists_() { return memo_('lists', listsRaw_); }
+function listsRaw_() {
   const cache = CacheService.getScriptCache();
   const hit = cache.get('lists');
   if (hit) return JSON.parse(hit);
@@ -607,7 +616,8 @@ function rowToEntry_(r, row) {
 function liveRow_(r) { return r[EC['رقم القيد']] && !String(r[EC['محذوف']] || '').trim(); }
 
 /** كل القيود (غير الممسوحة)، الأحدث الأول. */
-function entries_() {
+function entries_() { return memo_('entries', entriesRaw_); }
+function entriesRaw_() {
   const out = [];
   const rows = values_(entriesSheet_(), E_HEADERS.length);
   for (let i = rows.length - 1; i >= 0; i--) if (liveRow_(rows[i])) out.push(rowToEntry_(rows[i], i + 2));
@@ -657,6 +667,7 @@ function mustUnit_(unit, sector) {
   if (list.length && !list.some(function (x) { return x.toUpperCase() === String(unit).toUpperCase(); })) throw new Error('اختار الوحدة من القايمة.');
 }
 function addEntry(token, d) {
+  forget_('entries');
   const u = auth_(token, 'add');
   const l = lists_();
   const unit = clean_(d.unit).toUpperCase(), sector = clean_(d.sector), item = clean_(d.item), qty = Math.round(Number(d.qty));
@@ -682,9 +693,12 @@ function addEntry(token, d) {
 }
 
 /** آخر قيود مشرف الأمن ده. */
-function myEntries(token) {
+function myEntries(token, f) {
   const u = auth_(token);
-  return entries_().filter(function (e) { return e.guardUser === u.username; }).slice(0, 1500).map(clientEntry_);
+  f = f || {};
+  const unit = String(f.unit || '').trim().toUpperCase();
+  return entries_().filter(function (e) { return e.guardUser === u.username && (!unit || (e.unit.toUpperCase() === unit && e.sector === f.sector)); })
+    .slice(0, 1500).map(clientEntry_);
 }
 
 function reviewList(token) {
@@ -729,6 +743,7 @@ function patrolList(token, sector, unit, mineOnly) {
 }
 
 function patrol(token, id, status) {
+  forget_('entries');
   const u = auth_(token, 'patrol');
   if (FIELD.indexOf(status) < 0) throw new Error('حالة غير صحيحة.');
   let e;
@@ -892,6 +907,7 @@ function entryPhoto(token, id) {
 
 /** تعديل كامل من المكتب الرئيسي، وكل تغيير بيتسجل في سجل التعديلات. */
 function updateEntry(token, id, d) {
+  forget_('entries');
   const u = auth_(token);
   const l = lists_();
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
@@ -932,6 +948,7 @@ function updateEntry(token, id, d) {
 }
 
 function deleteEntry(token, id) {
+  forget_('entries');
   const u = auth_(token);
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
