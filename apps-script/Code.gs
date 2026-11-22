@@ -684,7 +684,7 @@ function addEntry(token, d) {
 /** آخر قيود مشرف الأمن ده. */
 function myEntries(token) {
   const u = auth_(token);
-  return entries_().filter(function (e) { return e.guardUser === u.username; }).slice(0, 40).map(clientEntry_);
+  return entries_().filter(function (e) { return e.guardUser === u.username; }).slice(0, 1500).map(clientEntry_);
 }
 
 function reviewList(token) {
@@ -717,14 +717,15 @@ function review(token, id, approve) {
 /** العناصر المعتمدة للمرور عليها، الأقدم مرور الأول. */
 function patrolList(token, sector, unit, mineOnly) {
   const u = auth_(token, 'patrol');
-  if (!sector) throw new Error('اختار القطاع الأول.');
-  mustScope_(u, sector);
+  // مشرف الأمن بيمر على الوحدات اللي سجّلها هو (من غير ما يختار قطاع)
+  if (!sector && !mineOnly) throw new Error('اختار القطاع الأول.');
+  if (sector) mustScope_(u, sector);
   unit = String(unit || '').trim().toLowerCase();
   const list = entries_().filter(function (e) {
-    return e.hoStatus === HO.done && e.sector === sector && (!unit || e.unit.toLowerCase().indexOf(unit) >= 0) && (!mineOnly || e.guardUser === u.username);
+    return e.hoStatus === HO.done && (!sector || e.sector === sector) && inScope_(u, e.sector) && (!unit || e.unit.toLowerCase().indexOf(unit) >= 0) && (!mineOnly || e.guardUser === u.username);
   }).map(clientEntry_);
   list.sort(function (a, b) { return (b.daysSince === null ? 1e9 : b.daysSince) - (a.daysSince === null ? 1e9 : a.daysSince); });
-  return list.slice(0, 300);
+  return list.slice(0, 1500);
 }
 
 function patrol(token, id, status) {

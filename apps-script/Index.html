@@ -260,7 +260,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <div class="bar-row">
         <label class="f">القطاع<select id="pSector"></select></label>
         <label class="f grow">رقم الوحدة (اختياري)<input id="pUnit" dir="ltr" style="text-align:right" placeholder="REZZO-014"></label>
-        <label class="chk" id="pMineRow" hidden><input type="checkbox" id="pMineOnly"> اللي سجّلته أنا بس</label>
+        <label class="chk" id="pMineRow" hidden><input type="checkbox" id="pMineOnly"> الوحدات اللي سجّلتها أنا</label>
         <button class="solid" id="pGo" type="button">عرض</button>
       </div>
       <div class="status" id="pStatus"></div>
@@ -636,6 +636,8 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $("#fStatus").innerHTML = '<option value="">كل الحالات</option>' + ["معتمد","مرفوض"].map(function(s){ return "<option>"+s+"</option>"; }).join("") + '<option value="flagged">بلاغات (مفقود / تالف)</option>';
     $("#auRating").innerHTML = B.ratings.map(function(r){ return "<option>"+esc(r)+"</option>"; }).join("");
     $("#auditForm").hidden = !B.can.audit; $("#pMineRow").hidden = !B.can.add;
+    // مشرف الأمن: المرور الدوري على الوحدات اللي سجّلها (كل قطاعاته)
+    if(B.can.add){ $("#pMineOnly").checked = true; $("#pSector").options[0].textContent = "كل قطاعاتي"; }
     ["#csvEntries","#copyEntries","#csvPatrols","#csvAudits","#csvUnits","#copyUnits"].forEach(function(s){ $(s).hidden = !B.can.export; });
     showView(tabs[0]);
     if(B.can.dash) loadAlerts();
@@ -665,7 +667,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var sel = $("#" + px + "UnitSel"), q = $("#" + px + "UnitQ"), txt = $("#" + px + "Unit");
     return unitsOf(sector).then(function(list){
       var on = list.length > 0;
-      sel.hidden = q.hidden = !on; txt.hidden = on;
+      sel.hidden = !on; q.hidden = true; txt.hidden = on;   // الوحدة بتتختار من القايمة بس
       if(!on) return;
       sel._all = list; q.value = "";
       fillUnits(sel, list, cur || txt.value);
@@ -703,15 +705,15 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 
   // بنود الوحدة اللي بتسجّلها دلوقتي، متجمّعة تحت الفورم
   var uiT = null;
-  function itemCard(e){ return '<div class="pcard"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span></div><div class="m"><span class="num">'+esc(e.id)+'</span><span class="num">'+esc(e.guardDate)+'</span>'+(e.notes ? '<span>'+esc(e.notes)+'</span>' : '')+'</div></div><div class="btns"><button class="sm" type="button" data-open="'+esc(e.id)+'">✏️ تعديل / مسح</button></div></div>'; }
+  function itemCard(e){ return '<div class="pcard"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span> '+flagPill(e.flag)+'</div><div class="m"><span class="num">'+esc(e.id)+'</span><span class="num">'+esc(e.guardDate)+'</span>'+(e.notes ? '<span>'+esc(e.notes)+'</span>' : '')+'</div></div><div class="btns"><button class="sm" type="button" data-open="'+esc(e.id)+'">✏️ تعديل</button><button class="sm bad" type="button" data-del="'+esc(e.id)+'">🗑️ مسح</button></div></div>'; }
   function drawUnitItems(){
     var unit = unitValue("a"), sec = $("#aSector").value, box = $("#aUnitItems");
     if(!unit || !sec){
       // من غير وحدة: آخر اللي سجّلته، متجمّع بالوحدة، علشان يعدّل أي حاجة
       run("myEntries", TOKEN).then(function(list){
         if(unitValue("a") && $("#aSector").value) return;
-        list = list.slice(0, 20);
-        box.innerHTML = list.length ? '<h3 style="margin:6px 0">آخر اللي سجّلته</h3>' + groupByUnit(list).map(function(g){
+        var groups = groupByUnit(list);
+        box.innerHTML = list.length ? '<h3 style="margin:6px 0">الوحدات اللي سجّلتها ('+groups.length+' وحدة · '+list.length+' بند)</h3>' + groups.map(function(g){
           return '<div class="ucard"><div class="uh"><div><div class="u">🏠 <span class="num">'+esc(g.unit)+'</span></div><div class="m"><span>'+bd(g.sector)+'</span><span>'+unitSummary(g)+'</span></div></div></div>' + g.items.map(itemCard).join("") + '</div>';
         }).join("") : "";
       }).catch(function(){});
@@ -726,6 +728,13 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     }).catch(function(){});
   }
   $("#aUnit").addEventListener("input", function(){ clearTimeout(uiT); uiT = setTimeout(drawUnitItems, 500); });
+  var delArm = null;
+  $("#aUnitItems").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-del]"); if(!b) return;
+    if(delArm !== b){ delArm = b; b.textContent = "اضغط تاني للتأكيد"; setTimeout(function(){ if(delArm === b){ delArm = null; b.textContent = "🗑️ مسح"; } }, 4000); return; }
+    delArm = null; busy(b, true, "بيمسح…");
+    run("deleteEntry", TOKEN, b.getAttribute("data-del")).then(function(){ toast("اتمسح البند."); drawUnitItems(); }).catch(function(err){ toast(errMsg(err)); busy(b, false, "🗑️ مسح"); });
+  });
   $("#aSector").addEventListener("change", drawUnitItems);
 
   function loadMine(){
@@ -780,16 +789,16 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(B.can.events) loadEvents();
   }
   function loadPatrolMine(){
-    if($("#pSector").value) loadPatrol();
+    if($("#pSector").value || (B.can.add && $("#pMineOnly").checked)) loadPatrol();
     run("myPatrols", TOKEN).then(function(list){
       $("#pMine").innerHTML = table(["التاريخ","الوحدة","الصنف","الحالة"], list.map(function(p){ return ['<span class="num">'+esc(p.date)+'</span>','<span class="num">'+esc(p.unit)+'</span>',esc(p.item),'<span class="pill '+(p.status === "موجود" ? "p-green" : "p-red")+'">'+esc(p.status)+'</span>']; }));
     }).catch(function(){});
   }
   function loadPatrol(){
-    var sec = $("#pSector").value, s = $("#pStatus");
-    if(!sec){ $("#pList").innerHTML = '<div class="empty">اختار القطاع الأول لعرض عناصر المرور الخاصة بيه.</div>'; return; }
+    var sec = $("#pSector").value, s = $("#pStatus"), mineOnly = B.can.add && $("#pMineOnly").checked;
+    if(!sec && !mineOnly){ $("#pList").innerHTML = '<div class="empty">اختار القطاع الأول لعرض عناصر المرور الخاصة بيه.</div>'; return; }
     store.set("mt.psector", sec); s.className = "status"; s.innerHTML = '<span class="spin"></span>';
-    run("patrolList", TOKEN, sec, $("#pUnit").value.trim(), B.can.add && $("#pMineOnly").checked).then(function(list){
+    run("patrolList", TOKEN, sec, $("#pUnit").value.trim(), mineOnly).then(function(list){
       var groups = groupByUnit(list);
       s.textContent = list.length + " عنصر معتمد في " + groups.length + " وحدة";
       $("#pList").innerHTML = list.length ? groups.map(function(g){
