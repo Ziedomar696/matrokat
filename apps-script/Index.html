@@ -393,11 +393,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     </div>
     <div class="card">
       <h2>قايمة الوحدات</h2>
-      <p class="hint">ارفع شيت الوحدات (MSA Units - By Parcel) زي ما هو، وبعدين اربط كل مجتمع بالقطاع بتاعه. المشرف هيختار رقم الوحدة من قايمة القطاع بدل ما يكتبه. القطاع اللي مش مربوط بيفضل الرقم فيه بيتكتب باليد.</p>
-      <label class="f">شيت الوحدات (‎.xlsx)<input type="file" id="unitsFile" accept=".xlsx"></label>
-      <div class="status" id="unitsSt"></div>
-      <div id="cmapBox"></div>
-      <div class="actions" id="cmapAct" hidden><button class="solid" id="cmapSave" type="button">حفظ الربط</button></div>
+      <p class="hint">القطاعات والوحدات متسجلة جوه البرنامج من شيت «MSA Units - By Parcel» (٢٠ قطاع · ٧٬٠٩١ وحدة). المشرف بيختار رقم الوحدة من قايمة القطاع. لو الوحدات اتغيرت، ابعت الشيت الجديد يتحدّث.</p>
     </div>
   </section>
 </div>
@@ -657,7 +653,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
 
   // ================================================================ add entry (مشرف الأمن)
-  function loadAdd(){ unitPicker("a", $("#aSector").value, $("#aUnit").value); }
+  function loadAdd(){ unitPicker("a", $("#aSector").value, $("#aUnit").value); drawUnitItems(); }
   // ===== قايمة الوحدات حسب القطاع (لو مش مربوطة، بيكتب الرقم بإيده) =====
   var UNITS = {};
   function unitsOf(sector){
@@ -707,15 +703,26 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 
   // بنود الوحدة اللي بتسجّلها دلوقتي، متجمّعة تحت الفورم
   var uiT = null;
+  function itemCard(e){ return '<div class="pcard"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span></div><div class="m"><span class="num">'+esc(e.id)+'</span><span class="num">'+esc(e.guardDate)+'</span>'+(e.notes ? '<span>'+esc(e.notes)+'</span>' : '')+'</div></div><div class="btns"><button class="sm" type="button" data-open="'+esc(e.id)+'">✏️ تعديل / مسح</button></div></div>'; }
   function drawUnitItems(){
     var unit = unitValue("a"), sec = $("#aSector").value, box = $("#aUnitItems");
-    if(!unit || !sec){ box.innerHTML = ""; return; }
+    if(!unit || !sec){
+      // من غير وحدة: آخر اللي سجّلته، متجمّع بالوحدة، علشان يعدّل أي حاجة
+      run("myEntries", TOKEN).then(function(list){
+        if(unitValue("a") && $("#aSector").value) return;
+        list = list.slice(0, 20);
+        box.innerHTML = list.length ? '<h3 style="margin:6px 0">آخر اللي سجّلته</h3>' + groupByUnit(list).map(function(g){
+          return '<div class="ucard"><div class="uh"><div><div class="u">🏠 <span class="num">'+esc(g.unit)+'</span></div><div class="m"><span>'+bd(g.sector)+'</span><span>'+unitSummary(g)+'</span></div></div></div>' + g.items.map(itemCard).join("") + '</div>';
+        }).join("") : "";
+      }).catch(function(){});
+      return;
+    }
     var k = unitKey({ unit: unit, sector: sec });
     run("myEntries", TOKEN).then(function(list){
       if(unitKey({ unit: unitValue("a"), sector: $("#aSector").value }) !== k) return;
       var g = { unit: unit, sector: sec, items: list.filter(function(e){ return unitKey(e) === k; }) };
-      box.innerHTML = g.items.length ? '<div class="ucard"><div class="uh"><div><div class="u">🏠 بنود الوحدة <span class="num">'+esc(unit)+'</span></div><div class="m"><span>'+bd(sec)+'</span><span>'+unitSummary(g)+'</span><span>دوس على أي بند تعدّله أو تمسحه</span></div></div></div>' +
-        g.items.map(function(e){ return '<div class="pcard click" data-id="'+esc(e.id)+'"><div><div class="t">'+esc(e.item)+' × <span class="num">'+e.qty+'</span>'+(e.hasPhoto ? " 📷" : "")+'</div><div class="m"><span class="num">'+esc(e.id)+'</span><span class="num">'+esc(e.guardDate)+'</span></div></div><div>'+supPill(e.supStatus)+'</div></div>'; }).join("") + '</div>' : "";
+      box.innerHTML = g.items.length ? '<div class="ucard"><div class="uh"><div><div class="u">🏠 بنود الوحدة <span class="num">'+esc(unit)+'</span></div><div class="m"><span>'+bd(sec)+'</span><span>'+unitSummary(g)+'</span></div></div></div>' +
+        g.items.map(itemCard).join("") + '</div>' : "";
     }).catch(function(){});
   }
   $("#aUnit").addEventListener("input", function(){ clearTimeout(uiT); uiT = setTimeout(drawUnitItems, 500); });
@@ -1029,107 +1036,6 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   });
   $("#csvAudits").addEventListener("click", function(){ run("exportAudits", TOKEN).then(function(rows){ csvDownload(rows, "تقرير_تدقيق_إعمار"); }).catch(function(err){ toast(errMsg(err)); }); });
 
-  function unzip(buf){
-    var dv = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
-    for (var i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
-    if (eocd < 0) throw new Error('الملف ده مش Excel (xlsx).');
-    var n = dv.getUint16(eocd + 10, true), p = dv.getUint32(eocd + 16, true), files = {}, dec = new TextDecoder();
-    for (var k = 0; k < n; k++) {
-      var method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true),
-        xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
-      var name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
-      files[name] = { method: method, off: off, csize: csize };
-      p += 46 + nl + xl + cl;
-    }
-    return function read(name){
-      var f = files[name]; if (!f) return Promise.resolve(null);
-      var ln = dv.getUint16(f.off + 26, true), lx = dv.getUint16(f.off + 28, true), data = u8.slice(f.off + 30 + ln + lx, f.off + 30 + ln + lx + f.csize);
-      if (f.method === 0) return Promise.resolve(dec.decode(data));
-      if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('المتصفح ده قديم ومش بيفتح ملفات Excel. جرّب من كروم على الكمبيوتر.'));
-      return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
-    };
-  }
-  function xmlDoc(s){ return new DOMParser().parseFromString(s, 'application/xml'); }
-  function kids(el, tag){ return Array.prototype.filter.call(el.childNodes, function(c){ return c.nodeType === 1 && (c.localName || c.nodeName.split(':').pop()) === tag; }); }
-  function readXlsx(buf){
-    var read = unzip(buf), out = [];
-    return Promise.all([read('xl/workbook.xml'), read('xl/_rels/workbook.xml.rels'), read('xl/sharedStrings.xml')]).then(function(r){
-      if (!r[0]) throw new Error('الملف ده مش Excel (xlsx).');
-      var rels = {}, shared = [];
-      Array.prototype.forEach.call(xmlDoc(r[1] || '<x/>').getElementsByTagName('Relationship'), function(x){
-        var t = x.getAttribute('Target'); rels[x.getAttribute('Id')] = t.charAt(0) === '/' ? t.slice(1) : 'xl/' + t.replace(/^\.\//, '');
-      });
-      if (r[2]) Array.prototype.forEach.call(xmlDoc(r[2]).documentElement.childNodes, function(si){
-        if (si.nodeType !== 1) return;
-        var txt = ''; (function walk(e){ Array.prototype.forEach.call(e.childNodes, function(c){
-          if (c.nodeType !== 1) return; var ln = c.localName; if (ln === 'rPh') return; if (ln === 't') txt += c.textContent; else walk(c); }); })(si);
-        shared.push(txt);
-      });
-      var sheets = Array.prototype.map.call(xmlDoc(r[0]).getElementsByTagName('sheet'), function(s){
-        return { name: s.getAttribute('name'), path: rels[s.getAttribute('r:id') || s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id')] };
-      });
-      return sheets.reduce(function(chain, sh){
-        return chain.then(function(){ return read(sh.path); }).then(function(x){
-          if (!x) return;
-          var rows = [];
-          Array.prototype.forEach.call(xmlDoc(x).getElementsByTagName('row'), function(row){
-            var cells = [];
-            kids(row, 'c').forEach(function(c){
-              var ref = c.getAttribute('r') || '', col = 0, m = ref.match(/^[A-Z]+/);
-              if (m) for (var i = 0; i < m[0].length; i++) col = col * 26 + m[0].charCodeAt(i) - 64; else col = cells.length + 1;
-              var t = c.getAttribute('t'), v = kids(c, 'v')[0], val = v ? v.textContent : '';
-              if (t === 's') val = shared[+val] || '';
-              else if (t === 'inlineStr') { var is = kids(c, 'is')[0]; val = is ? is.textContent : ''; }
-              else if (t === 'b') val = val === '1';
-              else if (t !== 'str' && t !== 'e' && val !== '' && !isNaN(val)) val = +val;
-              cells[col - 1] = val;
-            });
-            rows[(+row.getAttribute('r') || rows.length + 1) - 1] = cells;
-          });
-          out.push({ name: sh.name, rows: rows });
-        });
-      }, Promise.resolve()).then(function(){ return out; });
-    });
-  }
-
-
-  // ===== قايمة الوحدات: رفع الشيت وربط المجتمعات بالقطاعات =====
-  function drawCmap(){
-    var list = AD.communities || [];
-    $("#cmapAct").hidden = !list.length;
-    if(!list.length){ $("#cmapBox").innerHTML = '<div class="empty">لسه ما اترفعش شيت الوحدات.</div>'; return; }
-    var total = list.reduce(function(s, c){ return s + c.units; }, 0), un = list.filter(function(c){ return !c.sector; }).length;
-    $("#cmapBox").innerHTML = '<p class="hint">'+fmt(total)+' وحدة في '+list.length+' مجتمع'+(un ? ' · <b style="color:var(--amber)">'+un+' مش مربوطين بقطاع</b>' : ' · كلهم مربوطين ✓')+'</p>' +
-      '<div class="tablewrap"><table><thead><tr><th>المجتمع (من الشيت)</th><th>عدد الوحدات</th><th>القطاع في البرنامج</th></tr></thead><tbody>' + list.map(function(c){
-        return '<tr><td>'+esc(c.community)+'</td><td class="num">'+c.units+'</td><td><select data-comm="'+esc(c.community)+'"><option value="">— مش مربوط —</option>' +
-          AD.sectors.map(function(x){ return '<option value="'+esc(x)+'"'+(x === c.sector ? " selected" : "")+'>\u2068'+esc(x)+'\u2069</option>'; }).join("") + '</select></td></tr>';
-      }).join("") + '</tbody></table></div>';
-  }
-  $("#cmapSave").addEventListener("click", function(){
-    var map = {}; $$("#cmapBox select[data-comm]").forEach(function(s){ map[s.getAttribute("data-comm")] = s.value; });
-    var b = $("#cmapSave"); busy(b, true, "بيحفظ…");
-    run("saveCommunityMap", TOKEN, map).then(function(d){ AD = d; UNITS = {}; drawAdmin(); toast("اتحفظ ربط المجتمعات بالقطاعات."); }).catch(function(err){ toast(errMsg(err)); }).then(function(){ busy(b, false, "حفظ الربط"); });
-  });
-  $("#unitsFile").addEventListener("change", function(){
-    var f = this.files[0], st = $("#unitsSt"), inp = this; if(!f) return;
-    st.className = "status"; st.innerHTML = '<span class="spin"></span> بيقرا الشيت…';
-    f.arrayBuffer().then(readXlsx).then(function(sheets){
-      var rows = [];
-      sheets.forEach(function(sh){
-        var hi = -1, cu = -1, cc = -1;
-        for(var i = 0; i < Math.min(sh.rows.length, 6) && hi < 0; i++){
-          (sh.rows[i] || []).forEach(function(c, j){ var k = String(c == null ? "" : c).trim().toLowerCase(); if(k === "location code") cu = j; if(k === "community") cc = j; });
-          if(cu >= 0 && cc >= 0) hi = i;
-        }
-        if(hi < 0) return;
-        sh.rows.slice(hi + 1).forEach(function(r){ if(r && r[cu] && r[cc]) rows.push({ unit: String(r[cu]).trim(), community: String(r[cc]).trim() }); });
-      });
-      if(!rows.length) throw new Error("ملقتش في الملف شيت فيه عمودين «Location Code» و«Community».");
-      st.innerHTML = '<span class="spin"></span> بيحفظ ' + fmt(rows.length) + ' وحدة…';
-      return run("importUnits", TOKEN, rows).then(function(d){ AD = d; UNITS = {}; drawAdmin(); st.className = "status"; st.textContent = "✓ اترفعت " + fmt(rows.length) + " وحدة. راجع ربط المجتمعات تحت واضغط «حفظ الربط»."; });
-    }).catch(function(err){ st.className = "status err"; st.textContent = errMsg(err); }).then(function(){ inp.value = ""; });
-  });
-
   // ================================================================ admin: users / settings / lists
   var AD = null, editUser = null, delU = false;
   function loadAdmin(){ run("adminData", TOKEN).then(function(d){ AD = d; drawAdmin(); }).catch(function(err){ toast(errMsg(err)); }); }
@@ -1143,7 +1049,6 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     }).join("");
     $("#lsItem").innerHTML = AD.lists.filter(function(x){ return x.kind === "item"; }).map(tag).join("");
     $("#lsCompany").innerHTML = AD.lists.filter(function(x){ return x.kind === "company"; }).map(tag).join("");
-    drawCmap();
   }
   function drawPerms(p){
     $("#permTable").innerHTML = "<thead><tr><th>الصلاحية</th>" + ROLE_ORDER.map(function(r){ return "<th>"+esc(ROLE_LABEL[r])+"</th>"; }).join("") + "</tr></thead><tbody>" +

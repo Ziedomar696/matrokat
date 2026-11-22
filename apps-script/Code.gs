@@ -5,7 +5,7 @@
  * ⚙️ SETUP_CODE: كود بيتطلب مرة واحدة بس علشان تعمل أول حساب "المكتب الرئيسي".
  *    غيّره لأي كلمة تختارها قبل ما تعمل Deploy.
  */
-const SETUP_CODE = 'CHANGE-ME';
+const SETUP_CODE = 'Marassi2026';
 
 const TZ = 'Africa/Cairo';
 const TOKEN_DAYS = 30;
@@ -18,8 +18,6 @@ const USERS_SHEET = 'المستخدمين';
 const LISTS_SHEET = 'القوائم';
 const SETTINGS_SHEET = 'الإعدادات';
 const VISITS_SHEET = 'لقطات الكاميرات';
-const UNITS_SHEET = 'الوحدات';
-const MAP_KEY = 'ربط المجتمعات بالقطاعات';
 
 const E_HEADERS = ['رقم القيد', 'رقم الوحدة', 'القطاع', 'الصنف', 'الكمية', 'ملاحظات فرد الأمن', 'فرد الأمن', 'حساب فرد الأمن', 'تاريخ الحصر',
   'حالة المشرف', 'المشرف', 'تاريخ المراجعة', 'حالة المطابقة', 'تاريخ المطابقة',
@@ -75,8 +73,18 @@ const DEFAULT_CAN = {
 };
 const PERMS_KEY = 'الصلاحيات (الأدوار الجديدة)';
 
-const DEFAULT_SECTORS = ['1-AREZZO', 'VERONA', 'ISOLA', 'VENETO', 'VERDI', 'VECTORIA', 'BLANCA 1', 'BLANCA 2', 'BLANCA 4-3', 'VALENCIA',
-  'SAFI 2-1', 'CELIA', 'CATANIA 1', 'CATANIA 2', 'MARINA R1', 'MARINA R2', 'GREEK', 'SALERNO', 'LEA', 'FAYA', 'SKAYA', 'RIVA GREEK', 'ALTIA'];
+// القطاعات = تابات شيت MSA Units - By Parcel (ووحداتها في ملف Units.gs)
+const DEFAULT_SECTORS = ['Arezzo', 'Verona', 'Isola', 'Veneto', 'Catania', 'Greek & Riva Lagoons', 'Lea & Faya', 'Riva Views', 'Skaia & Altea',
+  'Riva & Salerno', 'Blanca', 'Valencia', 'Vectoria', 'Verdi', 'Marassi Bay', 'Safi Sands', 'Celia', 'Marina Residences', 'Marina 2 & Marina West',
+  'Marina Front & Marina Views'];
+// القطاعات القديمة ← الجديدة (القيود والمرور والزيارات والمستخدمين بيتنقلوا مرة واحدة)
+const OLD_SECTORS = { '1-AREZZO': 'Arezzo', 'AREZZO': 'Arezzo', 'VERONA': 'Verona', 'ISOLA': 'Isola', 'VENETO': 'Veneto', 'VERDI': 'Verdi', 'VECTORIA': 'Vectoria',
+  'VICTORIA': 'Vectoria', 'BLANCA': 'Blanca', 'BLANCA 1': 'Blanca', 'BLANCA 2': 'Blanca', 'BLANCA 3': 'Blanca', 'BLANCA 4': 'Blanca', 'BLANCA 4-3': 'Blanca',
+  'VALENCIA': 'Valencia', 'SAFI': 'Safi Sands', 'SAFI 2-1': 'Safi Sands', 'SAFI SANDS': 'Safi Sands', 'CELIA': 'Celia', 'CATANIA': 'Catania', 'CATANIA 1': 'Catania',
+  'CATANIA 2': 'Catania', 'MARINA R1': 'Marina Residences', 'MARINA R2': 'Marina Residences', 'GREEK': 'Greek & Riva Lagoons', 'RIVA GREEK': 'Greek & Riva Lagoons',
+  'RIVA LAGOONS': 'Greek & Riva Lagoons', 'SALERNO': 'Riva & Salerno', 'RIVA': 'Riva & Salerno', 'LEA': 'Lea & Faya', 'FAYA': 'Lea & Faya',
+  'SKAYA': 'Skaia & Altea', 'SKAIA': 'Skaia & Altea', 'ALTIA': 'Skaia & Altea', 'ALTEA': 'Skaia & Altea', 'RIVA VIEWS': 'Riva Views', 'MARASSI BAY': 'Marassi Bay',
+  'MARINA S1': 'Marina 2 & Marina West', 'MARINA S2': 'Marina Front & Marina Views' };
 const DEFAULT_ITEMS = ['لوحة رقم الوحدة', 'باب غرفة السيول', 'انتركم', 'بوابة لاند سكيب حديد او خشب', 'ابليك', 'كشاف سقف', 'كشاف علوي', 'جهاز تكييف',
   'طابات تكيف النحاس', 'لوحة ري', 'لوحة كهرباء', 'دلفه سلك شباك وتراس', 'مروحه سقف', 'برجوله', 'طبق دش', 'ماتور مياه', 'خرطوم مياه', 'حنفيه',
   'غطاء غرف الري', 'غطاء غرف الصرف', 'فيشه كهرباء', 'مفتاح كهرباء', 'كشاف حربه لاند سكيب', 'كشاف عمودي صغير', 'كشاف عمودي كبير', 'كشاف صغير',
@@ -166,7 +174,6 @@ function listsSheet_() {
     sh.hideColumns(4, 2);
   });
 }
-function unitsSheet_() { return ensureSheet_(UNITS_SHEET, ['الوحدة', 'المجتمع']); }
 function visitsSheet_() { return ensureSheet_(VISITS_SHEET, V_HEADERS, function (sh) { sh.hideColumns(1, 1); sh.hideColumns(8, 1); }); }
 function settingsSheet_() {
   return ensureSheet_(SETTINGS_SHEET, ['الإعداد', 'القيمة'], function (sh) { sh.getRange(2, 1, 1, 2).setValues([['أيام المرور الدوري', '7']]); });
@@ -380,6 +387,7 @@ function dropPhotos_() {
 function boot_(u) {
   autoApprove_();
   dropPhotos_();
+  migrateSectors_();
   const l = lists_();
   const can = {};
   Object.keys(PERMS).forEach(function (k) { can[k] = can_(u, k); });
@@ -387,84 +395,48 @@ function boot_(u) {
     overdueDays: overdueDays_(), sup: SUP, ho: HO, ratings: RATINGS };
 }
 
-// ================================================================ قايمة الوحدات (من شيت MSA Units)
+// ================================================================ قايمة الوحدات (ملف Units.gs)
 
-function communityMap_() {
-  const cache = CacheService.getScriptCache(), hit = cache.get('cmap');
-  if (hit) return JSON.parse(hit);
-  let m = {};
-  values_(settingsSheet_(), 2).forEach(function (r) { if (String(r[0]).trim() === MAP_KEY) { try { m = JSON.parse(String(r[1])) || {}; } catch (e) {} } });
-  cache.put('cmap', JSON.stringify(m), 300);
-  return m;
-}
-function saveSetting_(key, val) {
-  const sh = settingsSheet_();
-  let r = -1;
-  values_(sh, 1).forEach(function (x, i) { if (String(x[0]).trim() === key) r = i + 2; });
-  if (r > 0) sh.getRange(r, 2).setValue(val); else sh.appendRow([key, val]);
-}
-/** وحدات القطاع = وحدات المجتمعات المربوطة بيه. */
-function sectorUnits_(sector) {
-  const map = communityMap_(), comms = Object.keys(map).filter(function (c) { return map[c] === sector; });
-  if (!comms.length) return [];
-  return values_(unitsSheet_(), 2).filter(function (r) { return comms.indexOf(String(r[1]).trim()) >= 0; }).map(function (r) { return String(r[0]).trim(); });
-}
+function sectorUnits_(sector) { return (typeof UNITS_BY_SECTOR !== 'undefined' && UNITS_BY_SECTOR[sector]) || []; }
 function unitsFor(token, sector) {
   const u = auth_(token);
   mustScope_(u, sector);
   return sectorUnits_(sector);
 }
-function normName_(s) { return String(s || '').toLowerCase().replace(/^marassi\s+/, '').replace(/[^a-z0-9]/g, ''); }
-// تخمين القطاع: نفس الاسم بالظبط، ولو فيه أكتر من قطاع بنفس الاسم (BLANCA 1 / 2) لازم الرقم يطابق، وإلا يفضل فاضي للمكتب الرئيسي.
-function nameParts_(s) {
-  const words = String(s || '').toLowerCase().replace(/[-_]+/g, ' ').split(/\s+/).filter(String);
-  const core = [], nums = [];
-  words.forEach(function (w) {
-    if (w === 'marassi' || w === 'the') return;
-    const m = w.match(/^p?(\d+)[a-z]?$/); if (m) { nums.push(m[1]); return; }
-    if (/^(th|sa)$/.test(w)) return;
-    w.split(/(\d+)/).forEach(function (x) { if (/^\d+$/.test(x)) nums.push(x); else if (x.replace(/[^a-z]/g, '')) core.push(x.replace(/[^a-z]/g, '')); });
-  });
-  return { core: core.join(''), nums: nums };
-}
-function guessSector_(community, sectors) {
-  const c = nameParts_(community);
-  if (!c.core) return '';
-  const cand = sectors.filter(function (s) { return nameParts_(s).core === c.core; });
-  if (cand.length === 1) return cand[0];
-  const hit = cand.filter(function (s) { const n = nameParts_(s).nums; return c.nums.length && c.nums.every(function (x) { return n.indexOf(x) >= 0; }); });
-  return hit.length === 1 ? hit[0] : '';
-}
-/** المكتب الرئيسي بيرفع شيت الوحدات: [{unit, community}] (بيستبدل القايمة القديمة). */
-function importUnits(token, rows) {
-  auth_(token, ['admin']);
-  rows = (Array.isArray(rows) ? rows : []).map(function (r) { return [clean_(r.unit, 80).replace(/^Marassi\s+/i, ''), clean_(r.community, 80)]; })
-    .filter(function (r) { return r[0] && r[1]; });
-  if (!rows.length) throw new Error('ملقتش وحدات في الملف.');
-  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+
+// نقل القطاعات القديمة للجديدة (مرة واحدة)
+function migrateSectors_() {
+  const p = PropertiesService.getScriptProperties();
+  if (p.getProperty('SECTORS_V2')) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return;
   try {
-    const sh = unitsSheet_();
-    if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).clearContent();
-    sh.getRange(2, 1, rows.length, 2).setNumberFormat('@').setValues(rows);
-    const map = communityMap_(), sectors = lists_().sectors;
-    rows.forEach(function (r) { if (!(r[1] in map)) map[r[1]] = guessSector_(r[1], sectors); });
-    saveSetting_(MAP_KEY, JSON.stringify(map)); dropCache_('cmap');
+    if (p.getProperty('SECTORS_V2')) return;
+    const to = function (v) { const k = String(v || '').trim(); return OLD_SECTORS[k.toUpperCase()] || k; };
+    const fixCol = function (sh, col) {
+      const n = sh.getLastRow() - 1; if (n < 1) return;
+      const r = sh.getRange(2, col, n, 1), v = r.getValues(); let ch = 0;
+      v.forEach(function (x) { const y = to(x[0]); if (y !== String(x[0])) { x[0] = y; ch++; } });
+      if (ch) r.setValues(v);
+    };
+    fixCol(entriesSheet_(), EC['القطاع'] + 1); fixCol(patrolsSheet_(), 3); fixCol(auditsSheet_(), 4); fixCol(visitsSheet_(), 4);
+    const us = usersSheet_(), un = us.getLastRow() - 1;
+    if (un > 0) {
+      const r = us.getRange(2, 12, un, 1), v = r.getValues();
+      v.forEach(function (x) { const list = String(x[0] || '').split(/\s*،\s*/).filter(String).map(to); x[0] = list.filter(function (s, i) { return list.indexOf(s) === i; }).join(' ، '); });
+      r.setValues(v);
+    }
+    // القوايم: القطاعات القديمة تتوقف، والجديدة تتضاف
+    const ls = listsSheet_(), have = {};
+    values_(ls, LIST_HEADERS.length).forEach(function (r, i) {
+      if (String(r[0]).trim() !== KIND.sector) return;
+      const v = String(r[1]).trim(); have[v] = 1;
+      if (DEFAULT_SECTORS.indexOf(v) < 0 && OLD_SECTORS[v.toUpperCase()]) ls.getRange(i + 2, 3).setValue('لا');
+    });
+    DEFAULT_SECTORS.forEach(function (v) { if (!have[v]) ls.appendRow([KIND.sector, v, 'نعم', '', '', '']); });
+    dropCache_('lists'); dropCache_('users');
+    p.setProperty('SECTORS_V2', '1');
   } finally { lock.releaseLock(); }
-  return adminData(token);
-}
-function saveCommunityMap(token, map) {
-  auth_(token, ['admin']);
-  const sectors = lists_().all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; });
-  const out = {};
-  Object.keys(map || {}).forEach(function (c) { out[clean_(c, 80)] = sectors.indexOf(map[c]) >= 0 ? map[c] : ''; });
-  const lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try { saveSetting_(MAP_KEY, JSON.stringify(out)); dropCache_('cmap'); } finally { lock.releaseLock(); }
-  return adminData(token);
-}
-function unitsInfo_() {
-  const counts = {}, map = communityMap_();
-  values_(unitsSheet_(), 2).forEach(function (r) { const c = String(r[1]).trim(); if (c) counts[c] = (counts[c] || 0) + 1; });
-  return Object.keys(counts).sort().map(function (c) { return { community: c, units: counts[c], sector: map[c] || '' }; });
 }
 
 // ---------------------------------------------------------------- login
@@ -516,7 +488,7 @@ function adminData(token) {
   const l = lists_();
   return { users: users_().map(publicUser_), roles: ROLES, lists: l.all.map(function (x) { const o = Object.assign({}, x); delete o.row; return o; }),
     companies: l.companies, sectorCompany: l.sectorCompany, sectors: l.all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; }),
-    overdueDays: overdueDays_(), perms: perms_(), permLabels: PERMS, communities: unitsInfo_() };
+    overdueDays: overdueDays_(), perms: perms_(), permLabels: PERMS };
 }
 
 function saveUser(token, d) {
@@ -682,7 +654,7 @@ function nextId_() {
 
 function mustUnit_(unit, sector) {
   const list = sectorUnits_(sector);
-  if (list.length && !list.some(function (x) { return x.toUpperCase() === unit; })) throw new Error('اختار الوحدة من القايمة.');
+  if (list.length && !list.some(function (x) { return x.toUpperCase() === String(unit).toUpperCase(); })) throw new Error('اختار الوحدة من القايمة.');
 }
 function addEntry(token, d) {
   const u = auth_(token, 'add');
