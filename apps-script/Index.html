@@ -142,6 +142,8 @@ tr.ugh td .m{font-weight:500;font-size:12.5px;color:var(--muted);margin-inline-s
 .pcrow .hint{margin:2px 0 0}
 .ulist{display:flex;flex-wrap:wrap;gap:6px}
 .combo{position:relative}
+select.combo-src{display:none!important}
+.combo input{width:100%}
 .combo .cl{position:absolute;inset-inline:0;top:100%;z-index:30;max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);margin-top:4px}
 .combo .cl button{display:block;width:100%;text-align:start;border:0;border-bottom:1px solid var(--line);background:transparent;padding:11px 12px;font:inherit;color:inherit;border-radius:0}
 .combo .cl button:last-child{border-bottom:0}
@@ -255,7 +257,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
         <select id="aUnitSel" dir="ltr" hidden></select>
         <input id="aUnit" placeholder="مثال: REZZO-014" dir="ltr" style="text-align:right" autocapitalize="characters">
       </label>
-      <label class="f combo">الصنف<input id="aItemQ" type="text" autocomplete="off" placeholder="اكتب أول حرف من الصنف…"><select id="aItem" hidden></select><div class="cl" hidden></div></label>
+      <label class="f">الصنف<select id="aItem" data-q="اكتب أول حرف من الصنف…"></select></label>
       <label class="f">الكمية<input id="aQty" type="number" min="1" value="1" inputmode="numeric"></label>
       <label class="f wide">ملاحظات<textarea id="aNotes" placeholder="الحالة، اللون، المكان جوه الوحدة…"></textarea></label>
       <div class="actions wide"><button class="primary" id="aSave">تسجيل الحصر</button></div>
@@ -457,7 +459,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
           <select id="edUnitSel" dir="ltr" hidden></select>
           <input id="edUnit" dir="ltr" style="text-align:right">
         </label>
-        <label class="f combo">الصنف<input id="edItemQ" type="text" autocomplete="off" placeholder="اكتب أول حرف من الصنف…"><select id="edItem" hidden></select><div class="cl" hidden></div></label>
+        <label class="f">الصنف<select id="edItem" data-q="اكتب أول حرف من الصنف…"></select></label>
         <label class="f">الكمية<input id="edQty" type="number" min="1"></label>
         <label class="f edAdm">حالة المشرف<select id="edSup"></select></label>
         <label class="f edAdm">حالة المطابقة<select id="edHo"></select></label>
@@ -779,30 +781,50 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 
   // ===== الصنف: بيكتب أول حرف ويظهرله الأصناف اللي بتبدأ بيه =====
   function normAr(t){ return String(t || "").trim().replace(/[أإآٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[\u064B-\u0652\u0640]/g, "").replace(/\s+/g, " ").toLowerCase(); }
-  function itemCombo(id){
-    var sel = $("#" + id), q = $("#" + id + "Q"), box = q.parentNode.querySelector(".cl");
-    function list(){ return Array.prototype.map.call(sel.options, function(o){ return o.value; }).filter(String); }
-    function draw(){
-      var v = normAr(q.value), all = list();
-      var starts = [], words = [], has = [];   // أول الاسم ← أول أي كلمة ← جوّه الكلمة
-      all.forEach(function(x){ var n = normAr(x); if(!v || n.indexOf(v) === 0) starts.push(x); else if(n.split(" ").some(function(w){ return w.indexOf(v) === 0; })) words.push(x); else if(n.indexOf(v) >= 0) has.push(x); });
-      var out = starts.concat(words, has);
-      box.innerHTML = out.length ? out.slice(0, 80).map(function(x){ return '<button type="button" data-v="'+esc(x)+'">'+esc(x)+'</button>'; }).join("") : '<div class="none">مفيش صنف بالاسم ده</div>';
+  // خانة بحث مكان أي قايمة طويلة: بيكتب أول حرف أو رقم ويظهرله اللي بيبدأ بيه
+  function combo(sel, ph){
+    var w = document.createElement("div"); w.className = "combo";
+    var q = document.createElement("input"); q.type = "text"; q.autocomplete = "off"; q.setAttribute("autocapitalize", "off"); q.spellcheck = false;
+    q.placeholder = ph || sel.getAttribute("data-q") || "اكتب للبحث…"; if(sel.getAttribute("dir")) { q.dir = "auto"; }
+    var box = document.createElement("div"); box.className = "cl"; box.hidden = true;
+    w.appendChild(q); w.appendChild(box); sel.parentNode.insertBefore(w, sel); sel.classList.add("combo-src");
+    function opts(){ return Array.prototype.filter.call(sel.options, function(o){ return o.value !== ""; }); }
+    function blank(){ var o = Array.prototype.filter.call(sel.options, function(o){ return o.value === ""; })[0]; return o ? o.textContent : ""; }
+    function rank(n, v){
+      if(!v) return 0;
+      if(n.indexOf(v) === 0) return 1;
+      var t = n.split(/[\s\-\/\\.]+/);
+      if(t.indexOf(v) >= 0) return 1;
+      if(t.some(function(x){ return x.indexOf(v) === 0; })) return 2;
+      return n.indexOf(v) >= 0 ? 3 : 9;
+    }
+    function draw(all){
+      var v = all ? "" : normAr(q.value), hit = [];
+      opts().forEach(function(o, i){ var r = rank(normAr(o.value), v); if(r < 9) hit.push([r, i, o]); });
+      hit.sort(function(a, b){ return a[0] - b[0] || a[1] - b[1]; });
+      var b0 = blank();
+      box.innerHTML = (b0 && !v && sel.id !== "aItem" && sel.id !== "edItem" ? '<button type="button" data-v="">'+esc(b0)+'</button>' : "") +
+        (hit.length ? hit.slice(0, 100).map(function(h){ return '<button type="button" data-v="'+esc(h[2].value)+'">'+esc(h[2].textContent.replace(/[\u2068\u2069]/g, ""))+'</button>'; }).join("") : '<div class="none">مفيش نتيجة بالكلام ده</div>');
       box.hidden = false;
     }
+    function sync(){ if(document.activeElement !== q) q.value = sel.value || ""; w.hidden = sel.hidden; if(blank()) q.placeholder = blank(); }
     function pick(v){ sel.value = v; q.value = v; box.hidden = true; sel.dispatchEvent(new Event("change")); }
-    q.addEventListener("focus", function(){ q.select(); draw(); });
+    q.addEventListener("focus", function(){ q.select(); draw(true); });
+    q.addEventListener("click", function(){ if(box.hidden) draw(true); });
     q.addEventListener("input", function(){
-      var m = list().filter(function(x){ return normAr(x) === normAr(q.value); });
-      sel.value = m.length ? m[0] : ""; draw();
+      var m = opts().filter(function(o){ return normAr(o.value) === normAr(q.value); });
+      if(m.length || !q.value.trim()){ var nv = m.length ? m[0].value : ""; if(sel.value !== nv){ sel.value = nv; sel.dispatchEvent(new Event("change")); } }
+      draw();
     });
     q.addEventListener("keydown", function(e){ if(e.key === "Enter"){ var f = box.querySelector("button[data-v]"); if(f && !box.hidden){ e.preventDefault(); pick(f.getAttribute("data-v")); } } if(e.key === "Escape") box.hidden = true; });
     box.addEventListener("mousedown", function(e){ e.preventDefault(); });
     box.addEventListener("click", function(e){ var b = e.target.closest("button[data-v]"); if(b) pick(b.getAttribute("data-v")); });
-    q.addEventListener("blur", function(){ setTimeout(function(){ box.hidden = true; if(!sel.value) q.value = q.value; }, 150); });
-    sel._sync = function(){ q.value = sel.value || ""; };
+    q.addEventListener("blur", function(){ setTimeout(function(){ box.hidden = true; q.value = sel.value || ""; }, 150); });
+    new MutationObserver(sync).observe(sel, { childList: true, attributes: true, attributeFilter: ["hidden"] });
+    sel._sync = sync; sync();
   }
-  itemCombo("aItem"); itemCombo("edItem");
+  combo($("#aItem")); combo($("#edItem"));
+  combo($("#aUnitSel"), "اكتب رقم الوحدة أو جزء منه…"); combo($("#edUnitSel"), "اكتب رقم الوحدة أو جزء منه…"); combo($("#mUnit"), "كل الوحدات — اكتب للبحث…");
 
   // ===== وحدات القطاع: اللي اتسجل (من الورديتين) واللي لسه =====
   var MINE = [], MSEG = "done", SEC_DONE = {};
