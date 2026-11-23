@@ -99,12 +99,14 @@ img.cam{width:100%;max-height:320px;object-fit:contain;border-radius:8px;backgro
 .alert{border-radius:var(--radius);padding:10px 14px;display:grid;gap:6px}
 .alert.red{background:var(--red-bg);border:1px solid var(--red)}
 .alert.amber{background:var(--amber-bg);border:1px solid var(--amber)}
+.alert.green{background:var(--green-bg,var(--surface-2));border:1px solid var(--green)}
 .alert b{font-size:15px}
 .alert ul{margin:0;padding-inline-start:18px;font-size:13.5px;max-height:160px;overflow:auto}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;display:grid;gap:2px}
 .kpi span{color:var(--muted);font-size:12.5px}
 .kpi b{font-size:24px;line-height:1.2}
+.kpi b small{font-size:13px;color:var(--muted);font-weight:500}
 .kpi.good b{color:var(--green)}.kpi.warn b{color:var(--amber)}.kpi.bad b{color:var(--red)}
 .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
 .wrap>*,.card>*,[data-v]>*{min-width:0}
@@ -315,6 +317,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <p class="hint" id="dCovHint"></p>
       <div class="meter"><i id="dCovBar"></i></div>
     </div>
+    <div class="card"><h3>إنجاز الحصر حسب القطاع</h3><p class="hint">الوحدة بتتحسب «مكتمل حصرها» لو اتسجل عليها بنود أو اتأكد إنها خالية من المتروكات. المرور الدوري بيبدأ في القطاع بعد اكتمال حصره.</p><div id="dProg"></div></div>
     <div class="card"><h3>توزيع القيود حسب القطاع</h3><div id="dSectors"></div></div>
   </section>
 
@@ -659,7 +662,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(!tabs.length){ $$("[data-v]").forEach(function(s){ s.hidden = true; }); toast("حسابك لسه ملهوش صلاحيات. كلّم المكتب الرئيسي."); return; }
     options($("#aSector"), B.sectors, "اختار القطاع"); options($("#aItem"), B.items, "اختار الصنف");
     options($("#pSector"), B.sectors, "اختار القطاع", store.get("mt.psector")); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); options($("#cSector"), B.sectors, "كل القطاعات");
-    $("#fStatus").innerHTML = '<option value="">كل الحالات</option>' + ["معتمد","مرفوض"].map(function(s){ return "<option>"+s+"</option>"; }).join("") + '<option value="flagged">بلاغات (مفقود / تالف)</option>';
+    $("#fStatus").innerHTML = '<option value="">كل الحالات</option>' + ["معتمد"].map(function(s){ return "<option>"+s+"</option>"; }).join("") + '<option value="flagged">بلاغات (مفقود / تالف)</option>';
     $("#auRating").innerHTML = B.ratings.map(function(r){ return "<option>"+esc(r)+"</option>"; }).join("");
     $("#auditForm").hidden = !B.can.audit; $("#pMineRow").hidden = !B.can.add;
     // مشرف الأمن: المرور الدوري على الوحدات اللي سجّلها (كل قطاعاته)
@@ -677,6 +680,10 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var h = "";
     if(d.flaggedList.length) h += '<div class="alert red"><b>⚠ يوجد '+d.flagged+' بلاغ يحتاج متابعة فورية</b><ul>' + d.flaggedList.map(function(e){ return "<li>"+esc(e.item)+" — وحدة "+esc(e.unit)+" ("+bd(e.sector)+") — "+esc(e.flag)+" — آخر مرور: <span class=\"num\">"+esc(e.lastCheck || "—")+"</span> "+esc(e.lastCheckBy)+"</li>"; }).join("") + '</ul></div>';
     if(d.overdueList.length) h += '<div class="alert amber"><b>⏱ '+d.overdueCount+' عنصر متأخر عليه مرور دوري (أكتر من '+d.overdueDays+' أيام)</b><ul>' + d.overdueList.map(function(e){ return "<li>"+esc(e.item)+" — وحدة "+esc(e.unit)+" ("+bd(e.sector)+") — من "+e.daysSince+" يوم من غير مرور</li>"; }).join("") + '</ul></div>';
+    var open = (d.progress || []).filter(function(p){ return !p.complete; }), full = (d.progress || []).filter(function(p){ return p.complete; });
+    if((d.progress || []).length) h += open.length
+      ? '<div class="alert amber"><b>📋 اكتمل حصر الوحدات في '+full.length+' من '+d.progress.length+' قطاع — '+fmt(d.unitsLeft)+' وحدة قيد الحصر</b><span class="hint">التفاصيل لكل قطاع في «إنجاز الحصر حسب القطاع» تحت.</span></div>'
+      : '<div class="alert green"><b>✅ اكتمل حصر الوحدات في كل القطاعات ('+d.progress.length+') والمرور الدوري شغّال فيها.</b></div>';
     $("#alerts").innerHTML = h;
   }
 
@@ -976,10 +983,12 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       drawAlerts(d);
       var cov = d.coverage, cc = cov === null ? "" : cov >= 80 ? "good" : cov >= 50 ? "warn" : "bad";
       var k = function(label, v, cls){ return '<div class="kpi '+(cls||"")+'"><span>'+esc(label)+'</span><b class="num">'+v+'</b></div>'; };
-      $("#dKpis").innerHTML = k("إجمالي القيود", fmt(d.total)) + k("معتمدة ومطابقة", fmt(d.verified), "good") + k("مرفوضة", fmt(d.rejected)) +
+      $("#dKpis").innerHTML = k("إجمالي القيود", fmt(d.total)) + k("معتمدة ومطابقة", fmt(d.verified), "good") +
+        k("وحدات مكتمل حصرها", fmt(d.unitsDone) + (d.unitsTotal ? ' <small>من ' + fmt(d.unitsTotal) + '</small>' : ""), "good") + k("وحدات قيد الحصر", fmt(d.unitsLeft), d.unitsLeft ? "warn" : "good") +
         k("بلاغات مفقود / تالف", fmt(d.flagged), d.flagged ? "bad" : "") + k("متأخر عليها مرور", fmt(d.overdueCount), d.overdueCount ? "warn" : "") + k("نسبة الالتزام", cov === null ? "—" : cov + "٪", cc);
       $("#dCovHint").textContent = cov === null ? "لا توجد عناصر معتمدة لسه لقياس الالتزام." : (d.verified - d.overdueCount) + " من " + d.verified + " عنصر اتعمل عليهم مرور خلال آخر " + d.overdueDays + " أيام.";
       $("#dCovBar").style.width = (cov || 0) + "%"; $("#dCovBar").style.background = cc === "good" ? "var(--green)" : cc === "warn" ? "var(--amber)" : "var(--red)";
+      $("#dProg").innerHTML = (d.progress || []).length ? '<div class="hbars">' + d.progress.map(function(p){ var pc = Math.round(p.done * 100 / p.total); return '<div class="hbar"><span class="lbl">'+bd(p.sector)+(p.complete ? ' ✅' : '')+'</span><span class="track"><i style="width:'+pc+'%;background:'+(p.complete ? 'var(--green)' : 'var(--steel)')+'"></i></span><b class="num">'+fmt(p.done)+' / '+fmt(p.total)+'</b></div>'; }).join("") + '</div>' : '<div class="empty">لا توجد بيانات بعد.</div>';
       var max = Math.max.apply(null, d.bySector.map(function(x){ return x.n; }).concat([1]));
       $("#dSectors").innerHTML = d.bySector.length ? '<div class="hbars">' + d.bySector.map(function(x){ return '<div class="hbar"><span class="lbl">'+bd(x.k)+'</span><span class="track"><i style="width:'+(x.n/max*100)+'%"></i></span><b>'+fmt(x.n)+'</b></div>'; }).join("") + '</div>' : '<div class="empty">لا توجد بيانات بعد.</div>';
     }).catch(function(err){ toast(errMsg(err)); });

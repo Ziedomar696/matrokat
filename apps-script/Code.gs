@@ -983,7 +983,12 @@ function dashboard(token) {
   const flagged = all.filter(function (e) { return e.flag; });
   const bySector = {};
   all.forEach(function (e) { bySector[e.sector] = (bySector[e.sector] || 0) + 1; });
+  // إنجاز الحصر: الوحدات اللي اتحصرت (عليها بنود أو «مفيش متروكات») من وحدات كل قطاع
+  const progress = lists_().sectors.filter(function (s) { return inScope_(u, s) && sectorUnits_(s).length; }).map(sectorProgress_);
+  const unitsTotal = progress.reduce(function (n, p) { return n + p.total; }, 0), unitsDone = progress.reduce(function (n, p) { return n + p.done; }, 0);
   return {
+    unitsTotal: unitsTotal, unitsDone: unitsDone, unitsLeft: unitsTotal - unitsDone,
+    progress: progress.sort(function (a, b) { return (b.done / b.total) - (a.done / a.total) || b.done - a.done; }),
     total: all.length,
     pending: all.filter(function (e) { return e.supStatus === SUP.pending; }).length,
     approved: all.filter(function (e) { return e.supStatus === SUP.approved; }).length,
