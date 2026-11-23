@@ -783,7 +783,8 @@ function addEntry(token, d) {
   forget_('entries');
   const u = auth_(token, 'add');
   const l = lists_();
-  const unit = clean_(d.unit).toUpperCase(), sector = clean_(d.sector), item = clean_(d.item), qty = Math.round(Number(d.qty));
+  const sector = clean_(d.sector), item = clean_(d.item), qty = Math.round(Number(d.qty));
+  const unit = canonUnit_(sector, d.unit) || clean_(d.unit).toUpperCase();   // نفس اسم الوحدة اللي في القايمة
   if (!unit) throw new Error('اكتب رقم الوحدة.');
   if (l.sectors.indexOf(sector) < 0) throw new Error('اختار القطاع.');
   mustScope_(u, sector);
@@ -1046,7 +1047,7 @@ function updateEntry(token, id, d) {
     if (!full) { d.supStatus = e.supStatus; d.hoStatus = e.hoStatus; d.flag = e.flag; }   // صاحب القيد بيعدّل بياناته بس
     mustScope_(u, e.sector);
     const next = {
-      'رقم الوحدة': clean_(d.unit).toUpperCase(), 'القطاع': clean_(d.sector), 'الصنف': clean_(d.item), 'الكمية': String(Math.round(Number(d.qty))),
+      'رقم الوحدة': canonUnit_(clean_(d.sector), d.unit) || clean_(d.unit).toUpperCase(), 'القطاع': clean_(d.sector), 'الصنف': clean_(d.item), 'الكمية': String(Math.round(Number(d.qty))),
       'ملاحظات فرد الأمن': clean_(d.notes, 1000), 'حالة المشرف': d.supStatus, 'حالة المطابقة': d.hoStatus, 'الحالة الميدانية': d.flag || ''
     };
     if (!next['رقم الوحدة']) throw new Error('اكتب رقم الوحدة.');

@@ -136,6 +136,12 @@ tr.ugh td .m{font-weight:500;font-size:12.5px;color:var(--muted);margin-inline-s
 .mprog{display:grid;gap:6px;margin:6px 0 10px}
 #mSeg{margin-bottom:10px}
 .ulist{display:flex;flex-wrap:wrap;gap:6px}
+.combo{position:relative}
+.combo .cl{position:absolute;inset-inline:0;top:100%;z-index:30;max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);margin-top:4px}
+.combo .cl button{display:block;width:100%;text-align:start;border:0;border-bottom:1px solid var(--line);background:transparent;padding:11px 12px;font:inherit;color:inherit;border-radius:0}
+.combo .cl button:last-child{border-bottom:0}
+.combo .cl b{color:var(--brand)}
+.combo .cl .none{padding:11px 12px;color:var(--muted);font-size:13px}
 .ulist button{font-size:13px;padding:6px 10px;border-radius:8px;border:1px dashed var(--line);background:var(--surface);direction:ltr}
 .who{font-size:12px;border-radius:99px;padding:1px 8px;background:var(--surface-2);border:1px solid var(--line)}
 .who.me{border-color:var(--brand)}
@@ -244,7 +250,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
         <select id="aUnitSel" dir="ltr" hidden></select>
         <input id="aUnit" placeholder="مثال: REZZO-014" dir="ltr" style="text-align:right" autocapitalize="characters">
       </label>
-      <label class="f">الصنف<select id="aItem"></select></label>
+      <label class="f combo">الصنف<input id="aItemQ" type="text" autocomplete="off" placeholder="اكتب أول حرف من الصنف…"><select id="aItem" hidden></select><div class="cl" hidden></div></label>
       <label class="f">الكمية<input id="aQty" type="number" min="1" value="1" inputmode="numeric"></label>
       <label class="f wide">ملاحظات<textarea id="aNotes" placeholder="الحالة، اللون، المكان جوه الوحدة…"></textarea></label>
       <div class="actions wide"><button class="primary" id="aSave">تسجيل الحصر</button></div>
@@ -438,7 +444,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
           <select id="edUnitSel" dir="ltr" hidden></select>
           <input id="edUnit" dir="ltr" style="text-align:right">
         </label>
-        <label class="f">الصنف<select id="edItem"></select></label>
+        <label class="f combo">الصنف<input id="edItemQ" type="text" autocomplete="off" placeholder="اكتب أول حرف من الصنف…"><select id="edItem" hidden></select><div class="cl" hidden></div></label>
         <label class="f">الكمية<input id="edQty" type="number" min="1"></label>
         <label class="f edAdm">حالة المشرف<select id="edSup"></select></label>
         <label class="f edAdm">حالة المطابقة<select id="edHo"></select></label>
@@ -722,7 +728,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       toast("اتسجل الحصر (" + r.id + ") ودخل المرور الدوري.");
       var dm = SEC_DONE[d.sector], k = String(d.unit).toUpperCase();
       if(dm && !dm[k]){ dm[k] = [{ guardUser: B.me && B.me.username, guardName: B.me && B.me.name }]; var sel = $("#aUnitSel"); if(!sel.hidden) fillUnits(sel, sel._all || [], d.unit); }
-      $("#aItem").value = ""; $("#aQty").value = 1; $("#aNotes").value = "";
+      $("#aItem").value = ""; $("#aItem")._sync(); $("#aQty").value = 1; $("#aNotes").value = "";
       drawUnitItems();
     }).catch(function(err){ $("#aMsg").textContent = errMsg(err); }).then(function(){ busy(b, false, "تسجيل الحصر"); });
   });
@@ -753,6 +759,33 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     run("deleteEntry", TOKEN, b.getAttribute("data-del")).then(function(){ toast("اتمسح البند."); SEC_DONE = {}; if(current === "mine") loadMine(); else drawUnitItems(); }).catch(function(err){ toast(errMsg(err)); busy(b, false, "🗑️ مسح"); });
   });
   $("#aSector").addEventListener("change", drawUnitItems);
+
+  // ===== الصنف: بيكتب أول حرف ويظهرله الأصناف اللي بتبدأ بيه =====
+  function normAr(t){ return String(t || "").trim().replace(/[أإآٱ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[\u064B-\u0652\u0640]/g, "").replace(/\s+/g, " ").toLowerCase(); }
+  function itemCombo(id){
+    var sel = $("#" + id), q = $("#" + id + "Q"), box = q.parentNode.querySelector(".cl");
+    function list(){ return Array.prototype.map.call(sel.options, function(o){ return o.value; }).filter(String); }
+    function draw(){
+      var v = normAr(q.value), all = list();
+      var starts = [], words = [], has = [];   // أول الاسم ← أول أي كلمة ← جوّه الكلمة
+      all.forEach(function(x){ var n = normAr(x); if(!v || n.indexOf(v) === 0) starts.push(x); else if(n.split(" ").some(function(w){ return w.indexOf(v) === 0; })) words.push(x); else if(n.indexOf(v) >= 0) has.push(x); });
+      var out = starts.concat(words, has);
+      box.innerHTML = out.length ? out.slice(0, 80).map(function(x){ return '<button type="button" data-v="'+esc(x)+'">'+esc(x)+'</button>'; }).join("") : '<div class="none">مفيش صنف بالاسم ده</div>';
+      box.hidden = false;
+    }
+    function pick(v){ sel.value = v; q.value = v; box.hidden = true; sel.dispatchEvent(new Event("change")); }
+    q.addEventListener("focus", function(){ q.select(); draw(); });
+    q.addEventListener("input", function(){
+      var m = list().filter(function(x){ return normAr(x) === normAr(q.value); });
+      sel.value = m.length ? m[0] : ""; draw();
+    });
+    q.addEventListener("keydown", function(e){ if(e.key === "Enter"){ var f = box.querySelector("button[data-v]"); if(f && !box.hidden){ e.preventDefault(); pick(f.getAttribute("data-v")); } } if(e.key === "Escape") box.hidden = true; });
+    box.addEventListener("mousedown", function(e){ e.preventDefault(); });
+    box.addEventListener("click", function(e){ var b = e.target.closest("button[data-v]"); if(b) pick(b.getAttribute("data-v")); });
+    q.addEventListener("blur", function(){ setTimeout(function(){ box.hidden = true; if(!sel.value) q.value = q.value; }, 150); });
+    sel._sync = function(){ q.value = sel.value || ""; };
+  }
+  itemCombo("aItem"); itemCombo("edItem");
 
   // ===== وحدات القطاع: اللي اتسجل (من الورديتين) واللي لسه =====
   var MINE = [], MSEG = "done", SEC_DONE = {};
@@ -1029,7 +1062,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       $("#edUnit").value = e.unit; $("#edQty").value = e.qty; $("#edNotes").value = e.notes; $("#edFlag").value = e.flag || "";
       options($("#edSector"), B.sectors.indexOf(e.sector) < 0 ? B.sectors.concat([e.sector]) : B.sectors, null, e.sector);
       unitPicker("ed", e.sector, e.unit);
-      options($("#edItem"), B.items.indexOf(e.item) < 0 ? B.items.concat([e.item]) : B.items, null, e.item);
+      options($("#edItem"), B.items.indexOf(e.item) < 0 ? B.items.concat([e.item]) : B.items, null, e.item); $("#edItem")._sync();
       options($("#edSup"), ["قيد المراجعة","معتمد","مرفوض"], null, e.supStatus);
       options($("#edHo"), ["بانتظار المطابقة","تمت المطابقة","—"], null, e.hoStatus);
       $("#edDelete").textContent = "مسح القيد";
