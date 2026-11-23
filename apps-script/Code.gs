@@ -814,6 +814,20 @@ function myEntries(token, f) {
     .slice(0, 1500).map(clientEntry_);
 }
 
+// كل اللي اتسجل في القطاع (من مشرف النهار ومشرف الليل) علشان كل واحد يعرف إيه اللي اتسجل وإيه اللي لسه
+function sectorEntries(token, f) {
+  const u = auth_(token);
+  f = f || {};
+  const sector = String(f.sector || '').trim();
+  if (sector) mustScope_(u, sector);
+  if (!sector && !scope_(u)) return { needSector: true, list: [] };
+  const unit = String(f.unit || '').trim().toUpperCase();
+  const list = entries_().filter(function (e) {
+    return (sector ? e.sector === sector : inScope_(u, e.sector)) && (!unit || e.unit.toUpperCase() === unit);
+  }).slice(0, 4000).map(clientEntry_);
+  return { needSector: false, list: list };
+}
+
 function reviewList(token) {
   const u = auth_(token, 'review');
   const all = scopedEntries_(u);
@@ -844,12 +858,12 @@ function review(token, id, approve) {
 /** العناصر المعتمدة للمرور عليها، الأقدم مرور الأول. */
 function patrolList(token, sector, unit, mineOnly) {
   const u = auth_(token, 'patrol');
-  // مشرف الأمن بيمر على الوحدات اللي سجّلها هو (من غير ما يختار قطاع)
+  // مشرف الأمن بيمر على وحدات قطاعاته كلها (اللي سجّلها هو أو زميله في الوردية التانية)
   if (!sector && !mineOnly) throw new Error('اختار القطاع الأول.');
   if (sector) mustScope_(u, sector);
   unit = String(unit || '').trim().toLowerCase();
   const list = entries_().filter(function (e) {
-    return e.hoStatus === HO.done && (!sector || e.sector === sector) && inScope_(u, e.sector) && (!unit || e.unit.toLowerCase().indexOf(unit) >= 0) && (!mineOnly || e.guardUser === u.username);
+    return e.hoStatus === HO.done && (!sector || e.sector === sector) && inScope_(u, e.sector) && (!unit || e.unit.toLowerCase().indexOf(unit) >= 0) && (!mineOnly || !!scope_(u) || e.guardUser === u.username);
   }).map(clientEntry_);
   list.sort(function (a, b) { return (b.daysSince === null ? 1e9 : b.daysSince) - (a.daysSince === null ? 1e9 : a.daysSince); });
   return list.slice(0, 1500);
