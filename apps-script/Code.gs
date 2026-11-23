@@ -84,7 +84,12 @@ const OLD_SECTORS = { '1-AREZZO': 'Arezzo', 'AREZZO': 'Arezzo', 'VERONA': 'Veron
   'CATANIA 2': 'Catania', 'MARINA R1': 'Marina Residences', 'MARINA R2': 'Marina Residences', 'GREEK': 'Greek & Riva Lagoons', 'RIVA GREEK': 'Greek & Riva Lagoons',
   'RIVA LAGOONS': 'Greek & Riva Lagoons', 'SALERNO': 'Riva & Salerno', 'RIVA': 'Riva & Salerno', 'LEA': 'Lea & Faya', 'FAYA': 'Lea & Faya',
   'SKAYA': 'Skaia & Altea', 'SKAIA': 'Skaia & Altea', 'ALTIA': 'Skaia & Altea', 'ALTEA': 'Skaia & Altea', 'RIVA VIEWS': 'Riva Views', 'MARASSI BAY': 'Marassi Bay',
-  'MARINA S1': 'Marina 2 & Marina West', 'MARINA S2': 'Marina Front & Marina Views' };
+  'MARINA S1': 'Marina 2 & Marina West', 'MARINA S2': 'Marina Front & Marina Views', 'MARINA FRONT & VIEWS': 'Marina Front & Marina Views',
+  'MARINA FRONT': 'Marina Front & Marina Views', 'MARINA VIEWS': 'Marina Front & Marina Views', 'MARINA VIEWS & FRONT': 'Marina Front & Marina Views',
+  'MARINA WEST': 'Marina 2 & Marina West', 'MARINA 2': 'Marina 2 & Marina West', 'SAFI 1': 'Safi Sands', 'SAFI 2': 'Safi Sands',
+  'FAYA & LEA': 'Lea & Faya', 'LEA & FAYA': 'Lea & Faya', 'SKAIA & ALTEA': 'Skaia & Altea', 'GREEK & RIVA LAGOONS': 'Greek & Riva Lagoons' };
+// شركة الأمن لكل قطاع جديد (بتتحط بس لو الخانة فاضية)
+const SECTOR_COMPANY = { 'Celia': 'ليدز', 'Safi Sands': 'ليدز', 'Marina Residences': 'ليدز', 'Marina 2 & Marina West': 'ليدز', 'Marina Front & Marina Views': 'ليدز' };
 const DEFAULT_ITEMS = ['لوحة رقم الوحدة', 'باب غرفة السيول', 'انتركم', 'بوابة لاند سكيب حديد او خشب', 'ابليك', 'كشاف سقف', 'كشاف علوي', 'جهاز تكييف',
   'طابات تكيف النحاس', 'لوحة ري', 'لوحة كهرباء', 'دلفه سلك شباك وتراس', 'مروحه سقف', 'برجوله', 'طبق دش', 'ماتور مياه', 'خرطوم مياه', 'حنفيه',
   'غطاء غرف الري', 'غطاء غرف الصرف', 'فيشه كهرباء', 'مفتاح كهرباء', 'كشاف حربه لاند سكيب', 'كشاف عمودي صغير', 'كشاف عمودي كبير', 'كشاف صغير',
@@ -397,6 +402,7 @@ function boot_(u) {
   autoApprove_();
   dropPhotos_();
   migrateSectors_();
+  migrateSectorsV3_();
   const l = lists_();
   const can = {};
   Object.keys(PERMS).forEach(function (k) { can[k] = can_(u, k); });
@@ -445,6 +451,113 @@ function migrateSectors_() {
     DEFAULT_SECTORS.forEach(function (v) { if (!have[v]) ls.appendRow([KIND.sector, v, 'نعم', '', '', '']); });
     dropCache_('lists'); dropCache_('users');
     p.setProperty('SECTORS_V2', '1');
+  } finally { lock.releaseLock(); }
+}
+
+// اسم الوحدة القديم (رقم بس، أو G1/11NAVY، أو 11DM.G1 ...) ← اسمها في قايمة الوحدات. لو مفيش تطابق واحد أكيد بيرجع null.
+function canonUnit_(sector, raw) {
+  const list = sectorUnits_(sector); if (!list.length) return null;
+  let s = String(raw == null ? '' : raw).trim(); if (!s) return null;
+  s = s.replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); }).replace(/¹/g, '1');
+  if (/^\d+\.0$/.test(s)) s = s.slice(0, -2);
+  const up = function (x) { return String(x).toUpperCase(); };
+  const exact = list.filter(function (u) { return up(u) === up(s); });
+  if (exact.length === 1) return exact[0];
+  const clean = up(s).replace(/[؀-ۿ]+/g, ' ').replace(/^[.\s]+|[.\s]+$/g, '').trim();
+  const ends = function (t, tail) { return t.slice(-tail.length) === tail; };
+  let m, c = [];
+  if ((m = clean.match(/^(\d+)$/))) {                                         // 28  ← Vectoria P1 V-V-28
+    const re = new RegExp('[- ]' + m[1] + '$'); c = list.filter(function (u) { return re.test(u); });
+  } else if ((m = clean.match(/^G\s*(\d+)[\s\/\\.]*(\d+)\s*([A-Z]{3})/))) {     // G1/11NAVY ← Marina-Front-11-Navy-G-1
+    const key = '-' + m[2] + '-' + m[3], tail = '-G-' + m[1];
+    c = list.filter(function (u) { const t = up(u); return t.indexOf(key) >= 0 && ends(t, tail); });
+  } else if ((m = clean.match(/^(\d+)\s*([A-Z]{3})[A-Z]*\s*(G|\d+)[\s\-\/\\.]*(\d+)$/))) { // 1TEAL 1-1 ← Marina-Front-1-Teal-1-1
+    const key = '-' + m[1] + '-' + m[2], tail = '-' + m[3] + '-' + m[4];
+    c = list.filter(function (u) { const t = up(u); return t.indexOf(key) >= 0 && ends(t, tail); });
+  } else if ((m = clean.match(/^(\d+[A-Z]+?)[.\-]?(G|\d+)[.\-]?(\d+)$/))) {      // 11DM.G1 ← Marina Residences-11DM-G-1
+    const tail = '-' + m[1] + '-' + m[2] + '-' + m[3];
+    c = list.filter(function (u) { return ends(up(u), tail); });
+  }
+  return c.length === 1 ? c[0] : null;
+}
+// القطاع + الوحدة الصح: الأول في نفس القطاع، ولو مش موجودة فيه ندوّر في كل القطاعات (لو لقيناها في قطاع واحد بس)
+function placeUnit_(sector, unit) {
+  const here = canonUnit_(sector, unit);
+  if (here) return { sector: sector, unit: here };
+  if (/^\s*[\d٠-٩]+(\.0)?\s*$/.test(String(unit))) return { sector: sector, unit: String(unit).replace(/\.0$/, '') };
+  const hits = [];
+  DEFAULT_SECTORS.forEach(function (s) { if (s === sector) return; const u = canonUnit_(s, unit); if (u) hits.push({ sector: s, unit: u }); });
+  return hits.length === 1 ? hits[0] : { sector: sector, unit: String(unit) };
+}
+
+// القطاعات القديمة بتتمسح من القوايم، وكل اللي اتسجل عليها بيتنقل للقطاع الجديد ووحدته من القايمة (مرة واحدة)
+function migrateSectorsV3_() {
+  const p = PropertiesService.getScriptProperties();
+  if (p.getProperty('SECTORS_V3')) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(25000)) return;
+  try {
+    if (p.getProperty('SECTORS_V3')) return;
+    const byUpper = {}; DEFAULT_SECTORS.forEach(function (s) { byUpper[s.toUpperCase()] = s; });
+    const to = function (v) { const k = String(v || '').trim(), K = k.toUpperCase(); return byUpper[K] || OLD_SECTORS[K] || k; };
+    let moved = 0, fixed = 0;
+    // uCol و sCol بيبدأوا من 1
+    const fix = function (sh, uCol, sCol) {
+      const n = sh.getLastRow() - 1; if (n < 1) return;
+      const w = Math.max(uCol, sCol), r = sh.getRange(2, 1, n, w), v = r.getValues();
+      const uOut = [], sOut = []; let ch = false;
+      v.forEach(function (x) {
+        const s0 = String(x[sCol - 1] || '').trim(), u0 = x[uCol - 1];
+        let s = to(s0), u = u0;
+        if (String(u0).trim() !== '') { const pl = placeUnit_(s, u0); if (pl.unit !== String(u0)) fixed++; s = pl.sector; u = pl.unit; }
+        if (s !== s0) moved++;
+        if (s !== s0 || u !== u0) ch = true;
+        uOut.push([u]); sOut.push([s]);
+      });
+      if (!ch) return;
+      sh.getRange(2, uCol, n, 1).setNumberFormat('@').setValues(uOut);
+      sh.getRange(2, sCol, n, 1).setValues(sOut);
+    };
+    fix(entriesSheet_(), EC['رقم الوحدة'] + 1, EC['القطاع'] + 1);
+    fix(patrolsSheet_(), 2, 3); fix(auditsSheet_(), 5, 4); fix(visitsSheet_(), 3, 4);
+    // قطاعات المستخدمين: الأسماء الجديدة، + أي قطاع اتنقلت له وحدات سجّلها المشرف (علشان تفضل ظاهرة عنده في «وحداتي»)
+    const owned = {};
+    const es = entriesSheet_(), en = es.getLastRow() - 1;
+    if (en > 0) es.getRange(2, 1, en, E_HEADERS.length).getValues().forEach(function (r) {
+      const acc = String(r[EC['حساب فرد الأمن']] || '').trim().toLowerCase(), s = String(r[EC['القطاع']] || '').trim();
+      if (acc && s) (owned[acc] = owned[acc] || {})[s] = 1;
+    });
+    const us = usersSheet_(), un = us.getLastRow() - 1;
+    if (un > 0) {
+      const r = us.getRange(2, 1, un, 12), v = r.getValues(), out = [];
+      v.forEach(function (x) {
+        let list = String(x[11] || '').split(/\s*،\s*/).filter(String).map(to);
+        if (list.length) list = list.concat(Object.keys(owned[String(x[0]).trim().toLowerCase()] || {}));
+        out.push([list.filter(function (s, i) { return list.indexOf(s) === i; }).join(' ، ')]);
+      });
+      us.getRange(2, 12, un, 1).setValues(out);
+    }
+    // القوايم: أي قطاع مش من الجديد يتمسح، والجديد يتأكد إنه موجود ونشط وليه شركة
+    const ls = listsSheet_(), rows = values_(ls, LIST_HEADERS.length), have = {}, del = [];
+    rows.forEach(function (r, i) {
+      if (String(r[0]).trim() !== KIND.sector) return;
+      const v = String(r[1]).trim();
+      if (DEFAULT_SECTORS.indexOf(v) < 0 || have[v]) { del.push(i + 2); return; }
+      have[v] = i + 2;
+    });
+    del.reverse().forEach(function (row) { ls.deleteRow(row); });
+    const rows2 = values_(ls, LIST_HEADERS.length);
+    rows2.forEach(function (r, i) {
+      if (String(r[0]).trim() !== KIND.sector) return;
+      const v = String(r[1]).trim();
+      if (String(r[2]).trim() === 'لا') ls.getRange(i + 2, 3).setValue('نعم');
+      if (!String(r[5] || '').trim()) ls.getRange(i + 2, 6).setValue(SECTOR_COMPANY[v] || 'فورسيز');
+    });
+    DEFAULT_SECTORS.forEach(function (v) { if (!have[v]) ls.appendRow([KIND.sector, v, 'نعم', '', '', SECTOR_COMPANY[v] || 'فورسيز']); });
+    editsSheet_().appendRow(["'" + stamp_(new Date()), 'system', '—', 'نقل القطاعات القديمة', del.length + ' قطاع قديم اتمسح',
+      moved + ' سجل اتنقل لقطاع جديد · ' + fixed + ' وحدة اتظبط اسمها على القايمة']);
+    dropCache_('lists'); dropCache_('users'); forget_('entries');
+    p.setProperty('SECTORS_V3', '1');
   } finally { lock.releaseLock(); }
 }
 
