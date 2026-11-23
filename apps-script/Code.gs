@@ -18,6 +18,8 @@ const USERS_SHEET = 'المستخدمين';
 const LISTS_SHEET = 'القوائم';
 const SETTINGS_SHEET = 'الإعدادات';
 const VISITS_SHEET = 'لقطات الكاميرات';
+const EMPTY_SHEET = 'وحدات بدون متروكات';
+const X_HEADERS = ['القطاع', 'الوحدة', 'بواسطة', 'الحساب', 'التاريخ'];
 
 const E_HEADERS = ['رقم القيد', 'رقم الوحدة', 'القطاع', 'الصنف', 'الكمية', 'ملاحظات فرد الأمن', 'فرد الأمن', 'حساب فرد الأمن', 'تاريخ الحصر',
   'حالة المشرف', 'المشرف', 'تاريخ المراجعة', 'حالة المطابقة', 'تاريخ المطابقة',
@@ -179,6 +181,7 @@ function listsSheet_() {
     sh.hideColumns(4, 2);
   });
 }
+function emptySheet_() { return ensureSheet_(EMPTY_SHEET, X_HEADERS); }
 function visitsSheet_() { return ensureSheet_(VISITS_SHEET, V_HEADERS, function (sh) { sh.hideColumns(1, 1); sh.hideColumns(8, 1); }); }
 function settingsSheet_() {
   return ensureSheet_(SETTINGS_SHEET, ['الإعداد', 'القيمة'], function (sh) { sh.getRange(2, 1, 1, 2).setValues([['أيام المرور الدوري', '7']]); });
@@ -826,7 +829,46 @@ function sectorEntries(token, f) {
   const list = entries_().filter(function (e) {
     return (sector ? e.sector === sector : inScope_(u, e.sector)) && (!unit || e.unit.toUpperCase() === unit);
   }).slice(0, 4000).map(clientEntry_);
-  return { needSector: false, list: list };
+  const empty = sector ? emptyUnits_().filter(function (x) { return x.sector === sector; }) : emptyUnits_().filter(function (x) { return inScope_(u, x.sector); });
+  return { needSector: false, list: list, empty: empty };
+}
+
+// ---------------------------------------------------------------- حصر القطاع (المرور الدوري بيتفتح بعد ما كل الوحدات تتحصر)
+function emptyUnits_() { return memo_('empty', function () {
+  return values_(emptySheet_(), X_HEADERS.length).filter(function (r) { return String(r[0]).trim() && String(r[1]).trim(); })
+    .map(function (r, i) { return { sector: String(r[0]).trim(), unit: String(r[1]).trim(), by: String(r[2]), user: String(r[3]), date: String(r[4]), row: i + 2 }; });
+}); }
+/** {total, done, left}: الوحدة بتتحسب محصورة لو عليها بند أو اتعلّم عليها «مفيش متروكات». */
+function sectorProgress_(sector) {
+  const list = sectorUnits_(sector), have = {};
+  if (!list.length) return { sector: sector, total: 0, done: 0, left: 0, complete: true };
+  entries_().forEach(function (e) { if (e.sector === sector) have[String(e.unit).toUpperCase()] = 1; });
+  emptyUnits_().forEach(function (x) { if (x.sector === sector) have[x.unit.toUpperCase()] = 1; });
+  let done = 0; list.forEach(function (u) { if (have[u.toUpperCase()]) done++; });
+  return { sector: sector, total: list.length, done: done, left: list.length - done, complete: done >= list.length };
+}
+// مشرف الأمن (اللي بيسجّل) بس هو اللي بيستنى لحد ما القطاع يخلص
+function patrolGated_(u) { return u.role !== 'admin' && can_(u, 'add'); }
+function patrolLocks(token) {
+  const u = auth_(token, 'patrol');
+  if (!patrolGated_(u)) return { gated: false, sectors: [] };
+  return { gated: true, sectors: lists_().sectors.filter(function (s) { return inScope_(u, s); }).map(sectorProgress_) };
+}
+/** الوحدة اتحصرت ومفيهاش متروكات (أو شيل العلامة). */
+function markEmpty(token, sector, unit, on) {
+  const u = auth_(token, 'add');
+  sector = clean_(sector); mustScope_(u, sector);
+  unit = canonUnit_(sector, unit) || clean_(unit);
+  mustUnit_(unit, sector);
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    forget_('empty');
+    const hit = emptyUnits_().filter(function (x) { return x.sector === sector && x.unit.toUpperCase() === unit.toUpperCase(); });
+    if (on && !hit.length) emptySheet_().appendRow([sector, unit, u.name, u.username, "'" + stamp_(new Date())]);
+    if (!on) hit.reverse().forEach(function (x) { emptySheet_().deleteRow(x.row); });
+    forget_('empty');
+  } finally { lock.releaseLock(); }
+  return sectorProgress_(sector);
 }
 
 function reviewList(token) {
@@ -863,9 +905,11 @@ function patrolList(token, sector, unit, mineOnly) {
   if (!sector && !mineOnly) throw new Error('اختار القطاع الأول.');
   if (sector) mustScope_(u, sector);
   unit = String(unit || '').trim().toLowerCase();
+  const gated = patrolGated_(u), open = {};
+  if (gated) lists_().sectors.forEach(function (s) { if (inScope_(u, s) && sectorProgress_(s).complete) open[s] = 1; });
   const list = entries_().filter(function (e) {
     return e.hoStatus === HO.done && (!sector || e.sector === sector) && inScope_(u, e.sector) && (!unit || e.unit.toLowerCase().indexOf(unit) >= 0) && (!mineOnly || !!scope_(u) || e.guardUser === u.username);
-  }).map(clientEntry_);
+  }).filter(function (e) { return !gated || open[e.sector]; }).map(clientEntry_);
   list.sort(function (a, b) { return (b.daysSince === null ? 1e9 : b.daysSince) - (a.daysSince === null ? 1e9 : a.daysSince); });
   return list.slice(0, 1500);
 }
@@ -881,6 +925,7 @@ function patrol(token, id, status) {
     if (!e) throw new Error('القيد ده مش موجود.');
     mustScope_(u, e.sector);
     if (e.hoStatus !== HO.done) throw new Error('القيد ده لسه ما اتعتمدش.');
+    if (patrolGated_(u) && !sectorProgress_(e.sector).complete) throw new Error('المرور الدوري في القطاع ده هيتفتح بعد ما كل وحداته تتحصر.');
     const now = stamp_(new Date());
     patrolsSheet_().appendRow([e.id, e.unit, e.sector, e.item, "'" + now, u.name, u.username, ROLES[u.role], u.company || '', status]);
     const sh = entriesSheet_();

@@ -691,7 +691,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   }
   function unitPicker(px, sector, cur){
     var sel = $("#" + px + "UnitSel"), q = $("#" + px + "UnitQ"), txt = $("#" + px + "Unit");
-    var doneP = px === "a" && sector ? (SEC_DONE[sector] ? Promise.resolve(SEC_DONE[sector]) : run("sectorEntries", TOKEN, { sector: sector }).then(function(r){ return SEC_DONE[sector] = doneMap(r.list || []); }).catch(function(){ return {}; })) : Promise.resolve(null);
+    var doneP = px === "a" && sector ? (SEC_DONE[sector] ? Promise.resolve(SEC_DONE[sector]) : run("sectorEntries", TOKEN, { sector: sector }).then(function(r){ return SEC_DONE[sector] = doneMap(r.list || [], r.empty); }).catch(function(){ return {}; })) : Promise.resolve(null);
     return Promise.all([unitsOf(sector), doneP]).then(function(r){
       var list = r[0];
       var on = list.length > 0;
@@ -705,7 +705,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     cur = String(cur || "").toUpperCase();
     var has = list.some(function(u){ return u.toUpperCase() === cur; });
     sel.innerHTML = '<option value="">اختار الوحدة (' + list.length + ')</option>' + (cur && !has ? '<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>' : "") +
-      list.slice(0, 2500).map(function(u){ var d = sel._done && sel._done[u.toUpperCase()]; return '<option value="'+esc(u)+'"'+(u.toUpperCase() === cur ? " selected" : "")+'>'+(d ? '✓ ' : '')+esc(u)+(d ? ' — اتسجلت ('+esc(whoList(d).join(' و '))+')' : '')+'</option>'; }).join("");
+      list.slice(0, 2500).map(function(u){ var d = sel._done && sel._done[u.toUpperCase()]; return '<option value="'+esc(u)+'"'+(u.toUpperCase() === cur ? " selected" : "")+'>'+(d ? '✓ ' : '')+esc(u)+(d ? (d.empty && d.length === 1 ? ' — مفيش متروكات' : ' — اتسجلت')+' ('+esc(whoList(d).join(' و '))+')' : '')+'</option>'; }).join("");
   }
   function unitValue(px){ var sel = $("#" + px + "UnitSel"); return sel.hidden ? $("#" + px + "Unit").value.trim() : sel.value; }
   ["a", "ed"].forEach(function(px){
@@ -789,7 +789,8 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 
   // ===== وحدات القطاع: اللي اتسجل (من الورديتين) واللي لسه =====
   var MINE = [], MSEG = "done", SEC_DONE = {};
-  function doneMap(list){ var m = {}; list.forEach(function(e){ var k = String(e.unit || "").trim().toUpperCase(); (m[k] = m[k] || []).push(e); }); return m; }
+  function doneMap(list, empty){ var m = {}; list.forEach(function(e){ var k = String(e.unit || "").trim().toUpperCase(); (m[k] = m[k] || []).push(e); });
+    (empty || []).forEach(function(x){ var k = x.unit.toUpperCase(); if(!m[k]) m[k] = []; m[k].empty = x; m[k].push({ guardUser: x.user, guardName: x.by }); }); return m; }
   function loadMine(){
     var secs = B.sectors || [];
     if(!$("#mSector").options.length || $("#mSector")._n !== secs.length){ options($("#mSector"), secs, null); $("#mSector")._n = secs.length; }
@@ -798,7 +799,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $("#mineTable").innerHTML = '<div class="empty">بيحمّل…</div>';
     Promise.all([run("sectorEntries", TOKEN, { sector: sec }), unitsOf(sec)]).then(function(r){
       if($("#mSector").value !== sec) return;
-      MINE = r[0].list || []; MINE._units = r[1] || []; SEC_DONE[sec] = doneMap(MINE); drawMine(true);
+      MINE = r[0].list || []; MINE._units = r[1] || []; MINE._empty = r[0].empty || []; SEC_DONE[sec] = doneMap(MINE, MINE._empty); drawMine(true);
     }).catch(function(err){ toast(errMsg(err)); });
   }
   function drawMine(rebuild){
@@ -807,16 +808,20 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(rebuild || $("#mUnit")._who !== who){ options($("#mUnit"), groups.map(function(g){ return g.unit; }), "كل الوحدات (" + groups.length + ")", cur); $("#mUnit")._who = who; }
     var un = $("#mUnit").value;
     if(un) groups = groups.filter(function(g){ return g.unit === un; });
-    var listU = MINE._units || [], done = doneMap(MINE), doneN = listU.filter(function(u){ return done[u.toUpperCase()]; }).length;
+    var empties = (MINE._empty || []).filter(function(x){ return !who || (who === "me" ? x.user === B.me.username : x.user !== B.me.username); });
+    var listU = MINE._units || [], done = doneMap(MINE, MINE._empty), doneN = listU.filter(function(u){ return done[u.toUpperCase()]; }).length;
     var left = listU.filter(function(u){ return !done[u.toUpperCase()]; });
-    var allGroups = groupByUnit(MINE).length;
-    $("#mineCount").textContent = allGroups + " وحدة · " + MINE.length + " بند";
+    var allGroups = groupByUnit(MINE).length, emptyN = (MINE._empty || []).length;
+    $("#mineCount").textContent = allGroups + " وحدة فيها بنود · " + MINE.length + " بند" + (emptyN ? " · " + emptyN + " من غير متروكات" : "");
     $("#mProg").hidden = !listU.length;
-    if(listU.length){ $("#mBar").style.width = Math.round(doneN * 100 / listU.length) + "%"; $("#mProgTxt").textContent = "اتسجل " + doneN + " من " + listU.length + " وحدة في القطاع · فاضل " + left.length; }
-    $$("#mSeg button").forEach(function(b){ var k = b.getAttribute("data-mseg"); b.classList.toggle("on", k === MSEG); b.textContent = k === "done" ? "اتسجلت (" + allGroups + ")" : "لسه ما اتسجلتش (" + left.length + ")"; });
+    if(listU.length){
+      $("#mBar").style.width = Math.round(doneN * 100 / listU.length) + "%"; $("#mBar").style.background = left.length ? "var(--steel)" : "var(--green)";
+      $("#mProgTxt").innerHTML = left.length ? "اتحصر " + doneN + " من " + listU.length + " وحدة في القطاع · فاضل <b>" + left.length + "</b> · <span>المرور الدوري بيتفتح لما القطاع يخلص</span>" : "✅ كل وحدات القطاع اتحصرت (" + listU.length + ") — المرور الدوري مفتوح";
+    }
+    $$("#mSeg button").forEach(function(b){ var k = b.getAttribute("data-mseg"); b.classList.toggle("on", k === MSEG); b.textContent = k === "done" ? "اتحصرت (" + (allGroups + emptyN) + ")" : "لسه ما اتحصرتش (" + left.length + ")"; });
     $("#mSeg").hidden = !listU.length;
     if(MSEG === "left" && listU.length){
-      $("#mineTable").innerHTML = left.length ? '<p class="hint">اضغط على أي وحدة علشان تسجّلها.</p><div class="ulist">' + left.map(function(u){ return '<button type="button" data-reg="'+esc(u)+'">'+esc(u)+'</button>'; }).join("") + '</div>' : '<div class="empty">كل وحدات القطاع اتسجلت 👌</div>';
+      $("#mineTable").innerHTML = left.length ? '<p class="hint">لكل وحدة: «تسجيل بنود» لو فيها متروكات، أو «مفيش متروكات» لو اتحصرت وطلعت فاضية.</p><div class="plist">' + left.map(function(u){ return '<div class="pcard"><div class="t num" dir="ltr" style="text-align:right">'+esc(u)+'</div><div class="btns">'+(B.can.add ? '<button class="sm" type="button" data-reg="'+esc(u)+'">➕ تسجيل بنود</button><button class="sm ok" type="button" data-empty="'+esc(u)+'">مفيش متروكات</button>' : '')+'</div></div>'; }).join("") + '</div>' : '<div class="empty">كل وحدات القطاع اتحصرت 👌 والمرور الدوري اتفتح.</div>';
       return;
     }
     // البنود بتتفتح لما تدوس على الوحدة (أسرع على الموبايل)
@@ -824,7 +829,8 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     MGROUPS = groups;
     $("#mineTable").innerHTML = groups.length ? groups.map(function(g, i){
       return '<div class="ucard'+(openAll ? ' open' : '')+'" data-gi="'+i+'"><div class="uh tog"><div><div class="u">🏠 <span class="num">'+esc(g.unit)+'</span></div><div class="m"><span>'+unitSummary(g)+'</span><span>سجّلها: '+esc(whoList(g.items).join(' و '))+'</span></div></div></div>' + (openAll ? g.items.map(itemCard).join("") : "") + '</div>';
-    }).join("") : '<div class="empty">'+(who ? "مفيش وحدات بالاختيار ده." : "لسه مفيش وحدات اتسجلت في القطاع ده.")+'</div>';
+    }).join("") : (empties.length ? "" : '<div class="empty">'+(who ? "مفيش وحدات بالاختيار ده." : "لسه مفيش وحدات اتسجلت في القطاع ده.")+'</div>');
+    if(empties.length && !un) $("#mineTable").insertAdjacentHTML("beforeend", '<h3 style="margin:14px 0 6px">وحدات اتحصرت ومفيهاش متروكات ('+empties.length+')</h3><div class="plist">' + empties.map(function(x){ var me = x.user === B.me.username; return '<div class="pcard"><div><div class="t num" dir="ltr" style="text-align:right">'+esc(x.unit)+'</div><div class="m"><span class="who'+(me ? ' me' : '')+'">'+(me ? 'أنا' : esc(x.by))+'</span><span class="num">'+esc(String(x.date).replace(/^\'/, ""))+'</span></div></div><div class="btns">'+((me || B.can.edit) ? '<button class="sm" type="button" data-unempty="'+esc(x.unit)+'">إلغاء العلامة</button>' : '')+'</div></div>'; }).join("") + '</div>');
   }
   $("#mSector").addEventListener("change", function(){ $("#mUnit").value = ""; loadMine(); });
   $("#mWho").addEventListener("change", function(){ drawMine(false); });
@@ -836,6 +842,12 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(h){ var c = h.parentNode, g = MGROUPS[+c.getAttribute("data-gi")]; if(!g) return;
       if(c.classList.toggle("open")) h.insertAdjacentHTML("afterend", g.items.map(itemCard).join(""));
       else while(h.nextSibling) c.removeChild(h.nextSibling);
+      return; }
+    var em = e.target.closest("button[data-empty],button[data-unempty]");
+    if(em){ var on = em.hasAttribute("data-empty"), uu = em.getAttribute(on ? "data-empty" : "data-unempty");
+      busy(em, true, "…");
+      run("markEmpty", TOKEN, $("#mSector").value, uu, on).then(function(p){ toast(on ? "اتعلّمت: الوحدة اتحصرت ومفيهاش متروكات." : "اتشالت العلامة."); if(p.complete && on) toast("✅ كل وحدات القطاع اتحصرت — المرور الدوري اتفتح."); SEC_DONE = {}; loadMine(); })
+        .catch(function(err){ toast(errMsg(err)); busy(em, false, on ? "مفيش متروكات" : "إلغاء العلامة"); });
       return; }
     var b = e.target.closest("button[data-reg]"); if(!b || !B.can.add) return;
     var sec = $("#mSector").value, unit = b.getAttribute("data-reg");
@@ -901,9 +913,12 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var sec = $("#pSector").value, s = $("#pStatus"), mineOnly = B.can.add && $("#pMineOnly").checked;
     if(!sec && !mineOnly){ $("#pList").innerHTML = '<div class="empty">اختار القطاع الأول لعرض عناصر المرور الخاصة بيه.</div>'; return; }
     store.set("mt.psector", sec); s.className = "status"; s.innerHTML = '<span class="spin"></span>';
-    run("patrolList", TOKEN, sec, $("#pUnit").value.trim(), mineOnly).then(function(list){
+    Promise.all([run("patrolList", TOKEN, sec, $("#pUnit").value.trim(), mineOnly), run("patrolLocks", TOKEN)]).then(function(rr){
+      var list = rr[0], lk = rr[1] || {}, locked = (lk.sectors || []).filter(function(p){ return !p.complete && (!sec || p.sector === sec); });
+      var lockHtml = locked.length ? locked.map(function(p){ return '<div class="ucard late"><div class="uh"><div><div class="u">🔒 المرور الدوري لسه مقفول — '+bd(p.sector)+'</div><div class="m"><span>اتحصر <b class="num">'+p.done+'</b> من <span class="num">'+p.total+'</span> وحدة · فاضل <b class="num">'+p.left+'</b></span><span>بيتفتح لوحده لما كل وحدات القطاع تتحصر</span></div></div><div class="btns"><button class="sm" type="button" data-golft="'+esc(p.sector)+'">الوحدات اللي فاضلة</button></div></div></div>'; }).join("") : "";
       var groups = groupByUnit(list);
       s.textContent = list.length + " عنصر معتمد في " + groups.length + " وحدة";
+      if(!list.length && locked.length){ s.textContent = ""; $("#pList").innerHTML = lockHtml; return; }
       $("#pList").innerHTML = list.length ? groups.map(function(g){
         var anyFlag = g.items.some(function(e){ return e.flag; }), anyLate = g.items.some(function(e){ return e.overdue; });
         var okIds = g.items.filter(function(e){ return !e.flag; }).map(function(e){ return e.id; });   // اللي عليه بلاغ مفقود/تالف ما يتعلمش موجود مع الكل
@@ -916,6 +931,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
               '<div class="btns"><button class="sm ok" type="button" data-p="موجود" data-id="'+esc(e.id)+'">لسه موجود</button><button class="sm bad" type="button" data-p="مفقود" data-id="'+esc(e.id)+'">مفقود</button><button class="sm warn" type="button" data-p="تالف" data-id="'+esc(e.id)+'">تالف</button></div></div>';
           }).join("") + '</div>';
       }).join("") : '<div class="empty">مفيش عناصر معتمدة نهائيًا في القطاع ده'+($("#pUnit").value.trim() ? " والوحدة دي" : "")+'.</div>';
+      if(lockHtml) $("#pList").insertAdjacentHTML("afterbegin", lockHtml);
     }).catch(function(err){ s.className = "status err"; s.textContent = errMsg(err); });
   }
   $("#pGo").addEventListener("click", loadPatrol);
@@ -923,6 +939,8 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   $("#pMineOnly").addEventListener("change", loadPatrol);
   var armed = null;
   $("#pList").addEventListener("click", function(e){
+    var gl = e.target.closest("button[data-golft]");
+    if(gl){ showView("mine"); $("#mSector").value = gl.getAttribute("data-golft"); MSEG = "left"; loadMine(); return; }
     var all = e.target.closest("button[data-p-all]");
     if(all){
       var ucard = all.closest(".ucard");
