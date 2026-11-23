@@ -137,6 +137,9 @@ tr.ugh td .m{font-weight:500;font-size:12.5px;color:var(--muted);margin-inline-s
 #aUnitItems{display:grid;gap:8px}
 .mprog{display:grid;gap:6px;margin:6px 0 10px}
 #mSeg{margin-bottom:10px}
+.pclist{display:grid;gap:6px}
+.pcrow{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.pcrow .hint{margin:2px 0 0}
 .ulist{display:flex;flex-wrap:wrap;gap:6px}
 .combo{position:relative}
 .combo .cl{position:absolute;inset-inline:0;top:100%;z-index:30;max-height:260px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);margin-top:4px}
@@ -317,7 +320,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <p class="hint" id="dCovHint"></p>
       <div class="meter"><i id="dCovBar"></i></div>
     </div>
-    <div class="card"><h3>إنجاز الحصر حسب القطاع</h3><p class="hint">الوحدة بتتحسب «مكتمل حصرها» لو اتسجل عليها بنود أو اتأكد إنها خالية من المتروكات. المرور الدوري بيبدأ في القطاع بعد اكتمال حصره.</p><div id="dProg"></div></div>
+    <div class="card"><h3>إنجاز الحصر حسب القطاع</h3><p class="hint">الوحدة بتتحسب «مكتمل حصرها» لو اتسجل عليها بنود أو اتأكد إنها خالية من المتروكات. المرور الدوري بيتفتح حسب اللي الإدارة محدداه لكل قطاع.</p><div id="dProg"></div></div>
     <div class="card"><h3>توزيع القيود حسب القطاع</h3><div id="dSectors"></div></div>
   </section>
 
@@ -410,6 +413,13 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
         <button class="solid" type="submit">حفظ</button>
       </div>
     </form>
+    <div class="card" id="patrolCtl">
+      <h2>التحكم في المرور الدوري</h2>
+      <p class="hint">لكل قطاع: <b>تلقائي</b> = المرور بيتفتح لمشرف الأمن لوحده لما كل وحدات القطاع تتحصر · <b>مفتوح</b> = يمروا دلوقتي حتى لو الحصر ما خلصش · <b>مقفول</b> = محدش يمر في القطاع ده (غير المكتب الرئيسي) لحد ما تفتحه.</p>
+      <div class="bar-row"><label class="f">غيّر كل القطاعات مرة واحدة<select id="pcAll"><option value="">—</option></select></label></div>
+      <div class="pclist" id="pcBody"></div>
+      <div class="actions"><button class="solid" id="pcSave" type="button">حفظ</button></div>
+    </div>
     <div class="card">
       <h2>القوايم</h2>
       <h3>القطاعات</h3><div class="tagset" id="lsSector"></div>
@@ -683,7 +693,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var open = (d.progress || []).filter(function(p){ return !p.complete; }), full = (d.progress || []).filter(function(p){ return p.complete; });
     if((d.progress || []).length) h += open.length
       ? '<div class="alert amber"><b>📋 اكتمل حصر الوحدات في '+full.length+' من '+d.progress.length+' قطاع — '+fmt(d.unitsLeft)+' وحدة قيد الحصر</b><span class="hint">التفاصيل لكل قطاع في «إنجاز الحصر حسب القطاع» تحت.</span></div>'
-      : '<div class="alert green"><b>✅ اكتمل حصر الوحدات في كل القطاعات ('+d.progress.length+') والمرور الدوري شغّال فيها.</b></div>';
+      : '<div class="alert green"><b>✅ اكتمل حصر الوحدات في كل القطاعات ('+d.progress.length+').</b></div>';
     $("#alerts").innerHTML = h;
   }
 
@@ -823,12 +833,12 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $("#mProg").hidden = !listU.length;
     if(listU.length){
       $("#mBar").style.width = Math.round(doneN * 100 / listU.length) + "%"; $("#mBar").style.background = left.length ? "var(--steel)" : "var(--green)";
-      $("#mProgTxt").innerHTML = left.length ? "اتحصر " + doneN + " من " + listU.length + " وحدة في القطاع · فاضل <b>" + left.length + "</b> · <span>المرور الدوري بيتفتح لما القطاع يخلص</span>" : "✅ كل وحدات القطاع اتحصرت (" + listU.length + ") — المرور الدوري مفتوح";
+      $("#mProgTxt").innerHTML = left.length ? "اتحصر " + doneN + " من " + listU.length + " وحدة في القطاع · فاضل <b>" + left.length + "</b>" : "✅ كل وحدات القطاع اتحصرت (" + listU.length + ")";
     }
     $$("#mSeg button").forEach(function(b){ var k = b.getAttribute("data-mseg"); b.classList.toggle("on", k === MSEG); b.textContent = k === "done" ? "اتحصرت (" + (allGroups + emptyN) + ")" : "لسه ما اتحصرتش (" + left.length + ")"; });
     $("#mSeg").hidden = !listU.length;
     if(MSEG === "left" && listU.length){
-      $("#mineTable").innerHTML = left.length ? '<p class="hint">لكل وحدة: «تسجيل بنود» لو فيها متروكات، أو «مفيش متروكات» لو اتحصرت وطلعت فاضية.</p><div class="plist">' + left.map(function(u){ return '<div class="pcard"><div class="t num" dir="ltr" style="text-align:right">'+esc(u)+'</div><div class="btns">'+(B.can.add ? '<button class="sm" type="button" data-reg="'+esc(u)+'">➕ تسجيل بنود</button><button class="sm ok" type="button" data-empty="'+esc(u)+'">مفيش متروكات</button>' : '')+'</div></div>'; }).join("") + '</div>' : '<div class="empty">كل وحدات القطاع اتحصرت 👌 والمرور الدوري اتفتح.</div>';
+      $("#mineTable").innerHTML = left.length ? '<p class="hint">لكل وحدة: «تسجيل بنود» لو فيها متروكات، أو «مفيش متروكات» لو اتحصرت وطلعت فاضية.</p><div class="plist">' + left.map(function(u){ return '<div class="pcard"><div class="t num" dir="ltr" style="text-align:right">'+esc(u)+'</div><div class="btns">'+(B.can.add ? '<button class="sm" type="button" data-reg="'+esc(u)+'">➕ تسجيل بنود</button><button class="sm ok" type="button" data-empty="'+esc(u)+'">مفيش متروكات</button>' : '')+'</div></div>'; }).join("") + '</div>' : '<div class="empty">كل وحدات القطاع اتحصرت 👌</div>';
       return;
     }
     // البنود بتتفتح لما تدوس على الوحدة (أسرع على الموبايل)
@@ -853,7 +863,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     var em = e.target.closest("button[data-empty],button[data-unempty]");
     if(em){ var on = em.hasAttribute("data-empty"), uu = em.getAttribute(on ? "data-empty" : "data-unempty");
       busy(em, true, "…");
-      run("markEmpty", TOKEN, $("#mSector").value, uu, on).then(function(p){ toast(on ? "اتعلّمت: الوحدة اتحصرت ومفيهاش متروكات." : "اتشالت العلامة."); if(p.complete && on) toast("✅ كل وحدات القطاع اتحصرت — المرور الدوري اتفتح."); SEC_DONE = {}; loadMine(); })
+      run("markEmpty", TOKEN, $("#mSector").value, uu, on).then(function(p){ toast(on ? "اتعلّمت: الوحدة اتحصرت ومفيهاش متروكات." : "اتشالت العلامة."); if(p.complete && on) toast("✅ كل وحدات القطاع اتحصرت."); SEC_DONE = {}; loadMine(); })
         .catch(function(err){ toast(errMsg(err)); busy(em, false, on ? "مفيش متروكات" : "إلغاء العلامة"); });
       return; }
     var b = e.target.closest("button[data-reg]"); if(!b || !B.can.add) return;
@@ -921,8 +931,10 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     if(!sec && !mineOnly){ $("#pList").innerHTML = '<div class="empty">اختار القطاع الأول لعرض عناصر المرور الخاصة بيه.</div>'; return; }
     store.set("mt.psector", sec); s.className = "status"; s.innerHTML = '<span class="spin"></span>';
     Promise.all([run("patrolList", TOKEN, sec, $("#pUnit").value.trim(), mineOnly), run("patrolLocks", TOKEN)]).then(function(rr){
-      var list = rr[0], lk = rr[1] || {}, locked = (lk.sectors || []).filter(function(p){ return !p.complete && (!sec || p.sector === sec); });
-      var lockHtml = locked.length ? locked.map(function(p){ return '<div class="ucard late"><div class="uh"><div><div class="u">🔒 المرور الدوري لسه مقفول — '+bd(p.sector)+'</div><div class="m"><span>اتحصر <b class="num">'+p.done+'</b> من <span class="num">'+p.total+'</span> وحدة · فاضل <b class="num">'+p.left+'</b></span><span>بيتفتح لوحده لما كل وحدات القطاع تتحصر</span></div></div><div class="btns"><button class="sm" type="button" data-golft="'+esc(p.sector)+'">الوحدات اللي فاضلة</button></div></div></div>'; }).join("") : "";
+      var list = rr[0], lk = rr[1] || {}, locked = (lk.sectors || []).filter(function(p){ return !p.open && (!sec || p.sector === sec); });
+      var lockHtml = locked.length ? locked.map(function(p){
+        if(p.why === "closed") return '<div class="ucard late"><div class="uh"><div><div class="u">🔒 المرور الدوري مقفول — '+bd(p.sector)+'</div><div class="m"><span>الإدارة قافلة المرور في القطاع ده دلوقتي، وهيتفتح لما تفتحه.</span></div></div></div></div>';
+        return '<div class="ucard late"><div class="uh"><div><div class="u">🔒 المرور الدوري لسه مقفول — '+bd(p.sector)+'</div><div class="m"><span>اتحصر <b class="num">'+p.done+'</b> من <span class="num">'+p.total+'</span> وحدة · فاضل <b class="num">'+p.left+'</b></span><span>بيتفتح لوحده لما كل وحدات القطاع تتحصر</span></div></div>'+(B.can.add ? '<div class="btns"><button class="sm" type="button" data-golft="'+esc(p.sector)+'">الوحدات اللي فاضلة</button></div>' : '')+'</div></div>'; }).join("") : "";
       var groups = groupByUnit(list);
       s.textContent = list.length + " عنصر معتمد في " + groups.length + " وحدة";
       if(!list.length && locked.length){ s.textContent = ""; $("#pList").innerHTML = lockHtml; return; }
@@ -1194,6 +1206,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $("#usersBody").innerHTML = AD.users.map(function(u){ return "<tr><td>"+esc(u.name)+"</td><td class=\"num\">"+esc(u.username)+"</td><td>"+esc(ROLE_LABEL[u.role])+"</td><td>"+(u.role === "admin" || !u.sectors.length ? "كل القطاعات" : u.sectors.map(bd).join("، "))+"</td><td>"+(u.active ? '<span class="pill p-green">شغال</span>' : '<span class="pill p-red">موقوف</span>')+"</td><td class=\"num\">"+esc(u.lastLogin || "—")+'</td><td><button class="sm" type="button" data-u="'+esc(u.username)+'">تعديل</button></td></tr>'; }).join("");
     $("#sDays").value = AD.overdueDays;
     drawPerms(AD.perms);
+    drawPatrolCtl();
     var tag = function(x){ return '<span class="tagitem'+(x.active ? "" : " off")+'"><b>'+esc(x.value)+'</b><button class="sm" type="button" data-kind="'+x.kind+'" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button></span>'; };
     $("#lsSector").innerHTML = AD.lists.filter(function(x){ return x.kind === "sector"; }).map(function(x){
       return '<span class="tagitem'+(x.active ? "" : " off")+'"><b>'+bd(x.value)+'</b><button class="sm" type="button" data-kind="sector" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button></span>';
@@ -1201,6 +1214,19 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $("#lsItem").innerHTML = AD.lists.filter(function(x){ return x.kind === "item"; }).map(tag).join("");
     $("#lsCompany").innerHTML = AD.lists.filter(function(x){ return x.kind === "company"; }).map(tag).join("");
   }
+  function drawPatrolCtl(){
+    var modes = AD.patrolModes || {}, keys = Object.keys(modes);
+    $("#pcAll").innerHTML = '<option value="">—</option>' + keys.map(function(k){ return '<option value="'+k+'">'+esc(modes[k])+'</option>'; }).join("");
+    $("#pcBody").innerHTML = (AD.patrol || []).map(function(p){
+      return '<div class="pcrow"><div><b>'+bd(p.sector)+'</b><div class="hint">'+(p.total ? 'اتحصر <span class="num">'+fmt(p.done)+'</span> من <span class="num">'+fmt(p.total)+'</span> وحدة' : 'مفيش قايمة وحدات')+(p.complete ? ' ✅' : '')+'</div></div><select data-pc="'+esc(p.sector)+'">' + keys.map(function(k){ return '<option value="'+k+'"'+(p.mode === k ? " selected" : "")+'>'+esc(modes[k])+'</option>'; }).join("") + '</select></div>';
+    }).join("");
+  }
+  $("#pcAll").addEventListener("change", function(){ var v = this.value; if(!v) return; $$("#pcBody select[data-pc]").forEach(function(x){ x.value = v; }); this.value = ""; toast("اتغيّرت كلها. دوس «حفظ» علشان تتطبّق."); });
+  $("#pcSave").addEventListener("click", function(){
+    var map = {}; $$("#pcBody select[data-pc]").forEach(function(x){ map[x.getAttribute("data-pc")] = x.value; });
+    var b = $("#pcSave"); busy(b, true, "بيحفظ…");
+    run("savePatrolModes", TOKEN, map).then(function(d){ AD = d; drawAdmin(); toast("اتحفظ التحكم في المرور الدوري."); }).catch(function(err){ toast(errMsg(err)); }).then(function(){ busy(b, false, "حفظ"); });
+  });
   function drawPerms(p){
     $("#permTable").innerHTML = "<thead><tr><th>الصلاحية</th>" + ROLE_ORDER.map(function(r){ return "<th>"+esc(ROLE_LABEL[r])+"</th>"; }).join("") + "</tr></thead><tbody>" +
       Object.keys(AD.permLabels).map(function(k){ return "<tr><td>"+esc(AD.permLabels[k])+"</td>" + ROLE_ORDER.map(function(r){ return '<td><input type="checkbox" data-p="'+k+'" data-r="'+r+'"'+((p[k] || []).indexOf(r) >= 0 ? " checked" : "")+' aria-label="'+esc(AD.permLabels[k] + " — " + ROLE_LABEL[r])+'"></td>'; }).join("") + "</tr>"; }).join("") + "</tbody>";

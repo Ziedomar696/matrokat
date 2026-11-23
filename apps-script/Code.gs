@@ -613,7 +613,8 @@ function adminData(token) {
   const l = lists_();
   return { users: users_().map(publicUser_), roles: ROLES, lists: l.all.map(function (x) { const o = Object.assign({}, x); delete o.row; return o; }),
     companies: l.companies, sectorCompany: l.sectorCompany, sectors: l.all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; }),
-    overdueDays: overdueDays_(), perms: perms_(), permLabels: PERMS };
+    overdueDays: overdueDays_(), perms: perms_(), permLabels: PERMS,
+    patrol: l.sectors.map(function (s) { return Object.assign({ mode: patrolMode_(s) }, sectorProgress_(s)); }), patrolModes: PATROL_MODES };
 }
 
 function saveUser(token, d) {
@@ -847,12 +848,46 @@ function sectorProgress_(sector) {
   let done = 0; list.forEach(function (u) { if (have[u.toUpperCase()]) done++; });
   return { sector: sector, total: list.length, done: done, left: list.length - done, complete: done >= list.length };
 }
-// مشرف الأمن (اللي بيسجّل) بس هو اللي بيستنى لحد ما القطاع يخلص
+// مشرف الأمن (اللي بيسجّل) هو اللي بيستنى لحد ما القطاع يخلص (في الوضع التلقائي)
 function patrolGated_(u) { return u.role !== 'admin' && can_(u, 'add'); }
+
+// تحكم الإدارة في المرور الدوري لكل قطاع: auto = بعد اكتمال الحصر · open = مفتوح · closed = مقفول
+const PATROL_KEY = 'المرور الدوري حسب القطاع';
+const PATROL_MODES = { auto: 'تلقائي', open: 'مفتوح', closed: 'مقفول' };
+function patrolModes_() { return memo_('pmodes', function () {
+  let m = {};
+  values_(settingsSheet_(), 2).forEach(function (r) { if (String(r[0]).trim() === PATROL_KEY) { try { m = JSON.parse(String(r[1])) || {}; } catch (e) {} } });
+  return m;
+}); }
+function patrolMode_(sector) { const m = patrolModes_()[sector]; return PATROL_MODES[m] ? m : 'auto'; }
+/** {open, mode, why, ...progress} للمستخدم ده في القطاع ده. */
+function patrolState_(u, sector) {
+  const mode = patrolMode_(sector), p = sectorProgress_(sector);
+  let open, why = '';
+  if (u.role === 'admin') open = true;
+  else if (mode === 'closed') { open = false; why = 'closed'; }
+  else if (mode === 'open') open = true;
+  else { open = !patrolGated_(u) || p.complete; if (!open) why = 'progress'; }
+  return Object.assign({ open: open, mode: mode, why: why }, p);
+}
 function patrolLocks(token) {
   const u = auth_(token, 'patrol');
-  if (!patrolGated_(u)) return { gated: false, sectors: [] };
-  return { gated: true, sectors: lists_().sectors.filter(function (s) { return inScope_(u, s); }).map(sectorProgress_) };
+  const st = lists_().sectors.filter(function (s) { return inScope_(u, s); }).map(function (s) { return patrolState_(u, s); });
+  return { gated: st.some(function (x) { return !x.open; }), sectors: st };
+}
+function savePatrolModes(token, map) {
+  auth_(token, ['admin']);
+  const out = {};
+  Object.keys(map || {}).forEach(function (k) { if (PATROL_MODES[map[k]] && map[k] !== 'auto') out[k] = map[k]; });
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = settingsSheet_();
+    let r = -1;
+    values_(sh, 1).forEach(function (x, i) { if (String(x[0]).trim() === PATROL_KEY) r = i + 2; });
+    if (r > 0) sh.getRange(r, 2).setValue(JSON.stringify(out)); else sh.appendRow([PATROL_KEY, JSON.stringify(out)]);
+    forget_('pmodes');
+  } finally { lock.releaseLock(); }
+  return adminData(token);
 }
 /** الوحدة اتحصرت ومفيهاش متروكات (أو شيل العلامة). */
 function markEmpty(token, sector, unit, on) {
@@ -905,11 +940,11 @@ function patrolList(token, sector, unit, mineOnly) {
   if (!sector && !mineOnly) throw new Error('اختار القطاع الأول.');
   if (sector) mustScope_(u, sector);
   unit = String(unit || '').trim().toLowerCase();
-  const gated = patrolGated_(u), open = {};
-  if (gated) lists_().sectors.forEach(function (s) { if (inScope_(u, s) && sectorProgress_(s).complete) open[s] = 1; });
+  const open = {};
+  lists_().sectors.forEach(function (s) { if (inScope_(u, s) && patrolState_(u, s).open) open[s] = 1; });
   const list = entries_().filter(function (e) {
     return e.hoStatus === HO.done && (!sector || e.sector === sector) && inScope_(u, e.sector) && (!unit || e.unit.toLowerCase().indexOf(unit) >= 0) && (!mineOnly || !!scope_(u) || e.guardUser === u.username);
-  }).filter(function (e) { return !gated || open[e.sector]; }).map(clientEntry_);
+  }).filter(function (e) { return open[e.sector] || u.role === 'admin'; }).map(clientEntry_);
   list.sort(function (a, b) { return (b.daysSince === null ? 1e9 : b.daysSince) - (a.daysSince === null ? 1e9 : a.daysSince); });
   return list.slice(0, 1500);
 }
@@ -925,7 +960,8 @@ function patrol(token, id, status) {
     if (!e) throw new Error('القيد ده مش موجود.');
     mustScope_(u, e.sector);
     if (e.hoStatus !== HO.done) throw new Error('القيد ده لسه ما اتعتمدش.');
-    if (patrolGated_(u) && !sectorProgress_(e.sector).complete) throw new Error('المرور الدوري في القطاع ده هيتفتح بعد ما كل وحداته تتحصر.');
+    const ps = patrolState_(u, e.sector);
+    if (!ps.open) throw new Error(ps.why === 'closed' ? 'الإدارة قافلة المرور الدوري في القطاع ده دلوقتي.' : 'المرور الدوري في القطاع ده هيتفتح بعد ما كل وحداته تتحصر.');
     const now = stamp_(new Date());
     patrolsSheet_().appendRow([e.id, e.unit, e.sector, e.item, "'" + now, u.name, u.username, ROLES[u.role], u.company || '', status]);
     const sh = entriesSheet_();
