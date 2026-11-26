@@ -184,6 +184,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
 .tagset{display:flex;flex-wrap:wrap;gap:8px}
 .tagitem{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:4px 6px 4px 12px;background:var(--surface-2)}
 .tagitem.off{opacity:.6}
+.tagitem small{font-size:11.5px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:0 6px}
 .tagitem select{width:auto;padding:3px 8px;font-size:12.5px;min-height:0}
 .perm td,.perm th{text-align:center}.perm td:first-child,.perm th:first-child{text-align:start;position:sticky;inset-inline-start:0;background:var(--surface)}
 .perm input{width:20px;height:20px;accent-color:var(--navy,#16233F)}
@@ -429,7 +430,7 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
       <h3>الأصناف</h3><div class="tagset" id="lsItem"></div>
       <form class="bar-row" data-kind="item"><label class="f grow">صنف جديد<input></label><button class="solid" type="submit">إضافة</button></form>
       <div class="tagset" id="lsCompany" hidden></div>
-      <p class="hint">الموقوف بيختفي من القوايم، بس بيفضل في القيود القديمة.</p>
+      <p class="hint">الموقوف بيختفي من القوايم، بس بيفضل في القيود القديمة. في الأصناف: الرقم جنب الصنف = عدد القيود عليه · ✏️ تعديل الاسم بيغيّره في القايمة وفي كل القيود القديمة · 🗑️ مسح بيشيله من القايمة، والقيود القديمة بتفضل باسمها.</p>
     </div>
     <div class="card">
       <h2>قايمة الوحدات</h2>
@@ -1233,7 +1234,14 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
     $("#lsSector").innerHTML = AD.lists.filter(function(x){ return x.kind === "sector"; }).map(function(x){
       return '<span class="tagitem'+(x.active ? "" : " off")+'"><b>'+bd(x.value)+'</b><button class="sm" type="button" data-kind="sector" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button></span>';
     }).join("");
-    $("#lsItem").innerHTML = AD.lists.filter(function(x){ return x.kind === "item"; }).map(tag).join("");
+    var use = AD.itemUsage || {};
+    $("#lsItem").innerHTML = AD.lists.filter(function(x){ return x.kind === "item"; }).map(function(x){
+      var n = use[x.value] || 0;
+      return '<span class="tagitem'+(x.active ? "" : " off")+'" data-item="'+esc(x.value)+'"><b>'+esc(x.value)+'</b>'+(n ? '<small class="num" title="عدد القيود">'+n+'</small>' : '')+
+        '<button class="sm" type="button" data-iedit="'+esc(x.value)+'" aria-label="تعديل '+esc(x.value)+'">✏️</button>' +
+        '<button class="sm" type="button" data-kind="item" data-val="'+esc(x.value)+'" data-on="'+(x.active ? "0" : "1")+'">'+(x.active ? "إيقاف" : "تشغيل")+'</button>' +
+        '<button class="sm bad" type="button" data-idel="'+esc(x.value)+'" data-n="'+n+'" aria-label="مسح '+esc(x.value)+'">🗑️</button></span>';
+    }).join("");
     $("#lsCompany").innerHTML = AD.lists.filter(function(x){ return x.kind === "company"; }).map(tag).join("");
   }
   function drawPatrolCtl(){
@@ -1271,6 +1279,28 @@ label.chk{white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:1
   $("#uAllSec").addEventListener("change", function(){ $("#uSecs").hidden = this.checked; if(this.checked) $$("#uSecs input").forEach(function(i){ i.checked = false; }); });
   function pickedSecs(){ return $("#uAllSec").checked ? [] : $$("#uSecs input").filter(function(i){ return i.checked; }).map(function(i){ return i.value; }); }
   function afterLists(d){ AD = d; drawAdmin(); run("whoami", TOKEN).then(function(r){ var tok = TOKEN; B = r; B.token = tok; options($("#aSector"), B.sectors, "اختار القطاع"); options($("#aItem"), B.items, "اختار الصنف"); options($("#pSector"), B.sectors, "اختار القطاع"); options($("#fSector"), B.sectors, "كل القطاعات"); options($("#auSector"), B.sectors, "اختار القطاع"); }); }
+  // تعديل / مسح الأصناف
+  var idelArm = null;
+  $("#lsItem").addEventListener("click", function(e){
+    var ed = e.target.closest("button[data-iedit]"), del = e.target.closest("button[data-idel]"), sv = e.target.closest("button[data-isave]"), cx = e.target.closest("button[data-icancel]");
+    if(ed){ var t = ed.closest(".tagitem"), v = ed.getAttribute("data-iedit");
+      t.innerHTML = '<input value="'+esc(v)+'" style="width:auto;min-width:140px;padding:4px 8px"><button class="sm ok" type="button" data-isave="'+esc(v)+'">حفظ</button><button class="sm" type="button" data-icancel="1">إلغاء</button>';
+      var inp = t.querySelector("input"); inp.focus(); inp.select();
+      inp.addEventListener("keydown", function(k){ if(k.key === "Enter"){ k.preventDefault(); t.querySelector("button[data-isave]").click(); } if(k.key === "Escape") drawAdmin(); });
+      return; }
+    if(cx){ drawAdmin(); return; }
+    if(sv){ var from = sv.getAttribute("data-isave"), to = sv.closest(".tagitem").querySelector("input").value.trim();
+      if(!to){ toast("اكتب الاسم الجديد."); return; }
+      if(to === from){ drawAdmin(); return; }
+      busy(sv, true, "…");
+      run("renameItem", TOKEN, from, to).then(function(d){ toast("اتغيّر «" + from + "» لـ «" + to + "» في القايمة وفي كل القيود."); afterLists(d); }).catch(function(err){ toast(errMsg(err)); busy(sv, false, "حفظ"); });
+      return; }
+    if(del){ var dv = del.getAttribute("data-idel"), n = +del.getAttribute("data-n");
+      if(idelArm !== del){ idelArm = del; del.textContent = n ? "عليه " + n + " قيد — اضغط تاني للمسح" : "اضغط تاني للمسح"; setTimeout(function(){ if(idelArm === del){ idelArm = null; del.textContent = "🗑️"; } }, 4000); return; }
+      idelArm = null; busy(del, true, "…");
+      run("deleteItem", TOKEN, dv).then(function(d){ toast("اتمسح «" + dv + "» من القايمة" + (n ? " (القيود القديمة فاضلة باسمه)." : ".")); afterLists(d); }).catch(function(err){ toast(errMsg(err)); busy(del, false, "🗑️"); });
+      return; }
+  });
   $("[data-v=admin]").addEventListener("click", function(e){ var b = e.target.closest("button[data-val]"); if(!b) return; busy(b, true); run("saveListValue", TOKEN, b.getAttribute("data-kind"), b.getAttribute("data-val"), b.getAttribute("data-on") === "1").then(afterLists).catch(function(err){ toast(errMsg(err)); busy(b, false); }); });
   $("#lsSector").addEventListener("change", function(e){
     var sel = e.target.closest("select[data-sec]"); if(!sel) return; sel.disabled = true;

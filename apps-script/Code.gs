@@ -614,7 +614,8 @@ function adminData(token) {
   return { users: users_().map(publicUser_), roles: ROLES, lists: l.all.map(function (x) { const o = Object.assign({}, x); delete o.row; return o; }),
     companies: l.companies, sectorCompany: l.sectorCompany, sectors: l.all.filter(function (x) { return x.kind === 'sector'; }).map(function (x) { return x.value; }),
     overdueDays: overdueDays_(), perms: perms_(), permLabels: PERMS,
-    patrol: l.sectors.map(function (s) { return Object.assign({ mode: patrolMode_(s) }, sectorProgress_(s)); }), patrolModes: PATROL_MODES };
+    patrol: l.sectors.map(function (s) { return Object.assign({ mode: patrolMode_(s) }, sectorProgress_(s)); }), patrolModes: PATROL_MODES,
+    itemUsage: itemUsage_() };
 }
 
 function saveUser(token, d) {
@@ -689,6 +690,53 @@ function saveListValue(token, kind, value, active) {
     dropCache_('lists');
   } finally { lock.releaseLock(); }
   return adminData(token);
+}
+
+/** تعديل اسم صنف: بيتغيّر في القايمة وفي كل القيود والمرور الدوري اللي عليه، ويتسجل في سجل التعديلات. */
+function renameItem(token, from, to) {
+  const u = auth_(token, ['admin']);
+  from = clean_(from); to = clean_(to);
+  if (!to) throw new Error('اكتب الاسم الجديد.');
+  if (from === to) return adminData(token);
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    const all = lists_().all, hit = all.filter(function (x) { return x.kind === 'item' && x.value === from; })[0];
+    if (!hit) throw new Error('الصنف ده مش موجود.');
+    if (all.some(function (x) { return x.kind === 'item' && x.value === to; })) throw new Error('فيه صنف بالاسم ده بالفعل.');
+    listsSheet_().getRange(hit.row, 2).setValue(to);
+    let n = 0;
+    const fix = function (sh, col) {
+      const k = sh.getLastRow() - 1; if (k < 1) return;
+      const r = sh.getRange(2, col, k, 1), v = r.getValues(); let ch = false;
+      v.forEach(function (x) { if (String(x[0]).trim() === from) { x[0] = to; ch = true; if (sh === es) n++; } });
+      if (ch) r.setValues(v);
+    };
+    const es = entriesSheet_();
+    fix(es, EC['الصنف'] + 1); fix(patrolsSheet_(), 4);
+    editsSheet_().appendRow(["'" + stamp_(new Date()), u.username, '—', 'تعديل اسم صنف', from, to + ' (' + n + ' قيد)']);
+    dropCache_('lists'); forget_('entries');
+  } finally { lock.releaseLock(); }
+  return adminData(token);
+}
+/** مسح صنف من القايمة. القيود القديمة بتفضل باسمها زي ما هي. */
+function deleteItem(token, value) {
+  const u = auth_(token, ['admin']);
+  value = clean_(value);
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    const hit = lists_().all.filter(function (x) { return x.kind === 'item' && x.value === value; })[0];
+    if (!hit) throw new Error('الصنف ده مش موجود.');
+    listsSheet_().deleteRow(hit.row);
+    editsSheet_().appendRow(["'" + stamp_(new Date()), u.username, '—', 'مسح صنف من القايمة', value, '']);
+    dropCache_('lists');
+  } finally { lock.releaseLock(); }
+  return adminData(token);
+}
+/** عدد القيود اللي على كل صنف (علشان الإدارة تعرف قبل المسح أو التعديل). */
+function itemUsage_() {
+  const m = {};
+  entries_().forEach(function (e) { m[e.item] = (m[e.item] || 0) + 1; });
+  return m;
 }
 
 /** الشركة المسؤولة عن القطاع (ظابط الوردية بيشوف قطاعات شركته). */
